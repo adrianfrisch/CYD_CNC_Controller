@@ -7,6 +7,20 @@
 #include <Arduino.h>
 
 // -----------------------------------------------------------------------------
+// DEVELOP MODE — set to 1 to disable GRBL serial and enable debug logging
+// In develop mode: no UART2 communication, simulated GRBL state,
+// extra serial output for every touch, screen switch, button press, etc.
+// -----------------------------------------------------------------------------
+#define DEVELOP_MODE      1
+
+// Debug logging macros (active only in DEVELOP_MODE)
+#if DEVELOP_MODE
+  #define DBG(fmt, ...)   Serial.printf("[DBG] " fmt "\n", ##__VA_ARGS__)
+#else
+  #define DBG(fmt, ...)   ((void)0)
+#endif
+
+// -----------------------------------------------------------------------------
 // GRBL Serial (UART2 → Arduino D0/D1)
 // -----------------------------------------------------------------------------
 #define GRBL_TX_PIN       27   // CYD GPIO27 → Arduino D0 (RX)

@@ -9,15 +9,25 @@
 GrblComm grbl;
 
 void GrblComm::begin() {
+#if DEVELOP_MODE
+    _connected = true;
+    _status.state = GrblState::Idle;
+    Serial.println("[GRBL] DEVELOP MODE — UART disabled, simulating Idle state");
+#else
     GRBL_SERIAL.begin(GRBL_BAUD_RATE, SERIAL_8N1, GRBL_RX_PIN, GRBL_TX_PIN);
     _rxPos = 0;
     _grblBufFree = GRBL_RX_BUFFER;
     _sentHead = _sentTail = _sentCount = 0;
     _connected = false;
     Serial.println("[GRBL] UART2 initialized");
+#endif
 }
 
 void GrblComm::loop() {
+#if DEVELOP_MODE
+    // No serial processing — keep simulated state
+    return;
+#else
     processIncoming();
 
     // Auto-poll status
@@ -33,6 +43,7 @@ void GrblComm::loop() {
         _status.state = GrblState::Unknown;
         Serial.println("[GRBL] Connection lost");
     }
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -41,6 +52,9 @@ void GrblComm::loop() {
 
 void GrblComm::sendLine(const char* cmd) {
     if (!cmd || cmd[0] == '\0') return;
+#if DEVELOP_MODE
+    DBG("GRBL sendLine: %s", cmd);
+#else
     int len = strlen(cmd) + 1; // +1 for \n
 
     // Character-counting: track buffer usage
@@ -53,10 +67,15 @@ void GrblComm::sendLine(const char* cmd) {
         _grblBufFree -= len;
         Serial.printf("[GRBL] >> %s (buf free: %d)\n", cmd, _grblBufFree);
     }
+#endif
 }
 
 void GrblComm::sendRealtime(char c) {
+#if DEVELOP_MODE
+    DBG("GRBL realtime: 0x%02X", (int)c);
+#else
     GRBL_SERIAL.write(c);
+#endif
 }
 
 void GrblComm::softReset()    { sendRealtime(0x18); _grblBufFree = GRBL_RX_BUFFER; _sentCount = 0; _sentHead = _sentTail = 0; }

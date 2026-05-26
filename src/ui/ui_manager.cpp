@@ -34,6 +34,7 @@ void UIManager::begin() {
     _screens[(int)ScreenId::Calibration] = new CalibrationScreen();
 
     // Load touch calibration from SD, or run calibration wizard
+    // Load touch calibration from SD, or run calibration wizard
     if (!loadCalibration()) {
         Serial.println("[UI] No calibration found — starting calibration wizard");
         switchScreen(ScreenId::Calibration);
@@ -51,6 +52,7 @@ void UIManager::loop() {
     if (pressed && !_touched && (millis() - _lastTouch > TOUCH_DEBOUNCE_MS)) {
         _touched = true;
         _lastTouch = millis();
+        DBG("Touch at screen(%d, %d) on screen %d", sx, sy, (int)_currentId);
         if (_current) {
             _current->onTouch(sx, sy);
         }
@@ -93,8 +95,10 @@ bool UIManager::getTouch(int16_t& screenX, int16_t& screenY) {
     if (!getRawTouch(rawX, rawY)) return false;
 
     // Map raw touch values to screen coordinates
-    int32_t sx = (int32_t)(rawX - _cal.rawXMin) * SCREEN_W / (_cal.rawXMax - _cal.rawXMin);
-    int32_t sy = (int32_t)(rawY - _cal.rawYMin) * SCREEN_H / (_cal.rawYMax - _cal.rawYMin);
+    // XPT2046 axes are swapped relative to ILI9341 landscape rotation=1:
+    //   raw X → screen Y,  raw Y → screen X
+    int32_t sx = (int32_t)(rawY - _cal.rawYMin) * SCREEN_W / (_cal.rawYMax - _cal.rawYMin);
+    int32_t sy = (int32_t)(rawX - _cal.rawXMin) * SCREEN_H / (_cal.rawXMax - _cal.rawXMin);
 
     // Clamp to screen bounds
     if (sx < 0) sx = 0;

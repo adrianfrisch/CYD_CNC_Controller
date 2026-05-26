@@ -75,22 +75,18 @@ void CalibrationScreen::draw() {
     collectPoint(TGT2_X, TGT2_Y, raw2X, raw2Y);
 
     // --- Compute calibration ---
-    // We know:
-    //   raw1 corresponds to screen (TGT1_X, TGT1_Y)
-    //   raw2 corresponds to screen (TGT2_X, TGT2_Y)
-    // So:
-    //   rawXMin = raw value that maps to screen X=0
-    //   rawXMax = raw value that maps to screen X=SCREEN_W
-    // Linear interpolation:
-    //   rawAtScreenX = raw1X + (raw2X - raw1X) * (screenX - TGT1_X) / (TGT2_X - TGT1_X)
+    // Axes are swapped: rawX→screenY, rawY→screenX
+    //   raw1 at screen (TGT1_X, TGT1_Y), raw2 at screen (TGT2_X, TGT2_Y)
+    //   rawX drives screenY: scaleRawX based on TGT_Y spread
+    //   rawY drives screenX: scaleRawY based on TGT_X spread
 
-    float scaleRawX = (float)(raw2X - raw1X) / (float)(TGT2_X - TGT1_X);
-    float scaleRawY = (float)(raw2Y - raw1Y) / (float)(TGT2_Y - TGT1_Y);
+    float scaleRawX = (float)(raw2X - raw1X) / (float)(TGT2_Y - TGT1_Y); // rawX per screenY pixel
+    float scaleRawY = (float)(raw2Y - raw1Y) / (float)(TGT2_X - TGT1_X); // rawY per screenX pixel
 
-    int16_t rawXMin = (int16_t)(raw1X - scaleRawX * TGT1_X);
-    int16_t rawXMax = (int16_t)(raw1X + scaleRawX * (SCREEN_W - TGT1_X));
-    int16_t rawYMin = (int16_t)(raw1Y - scaleRawY * TGT1_Y);
-    int16_t rawYMax = (int16_t)(raw1Y + scaleRawY * (SCREEN_H - TGT1_Y));
+    int16_t rawXMin = (int16_t)(raw1X - scaleRawX * TGT1_Y);
+    int16_t rawXMax = (int16_t)(raw1X + scaleRawX * (SCREEN_H - TGT1_Y));
+    int16_t rawYMin = (int16_t)(raw1Y - scaleRawY * TGT1_X);
+    int16_t rawYMax = (int16_t)(raw1Y + scaleRawY * (SCREEN_W - TGT1_X));
 
     TouchCalData cal;
     cal.rawXMin = rawXMin;
