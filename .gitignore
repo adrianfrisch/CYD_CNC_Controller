@@ -18,6 +18,9 @@ cmake-build-*/
 .DS_Store
 Thumbs.db
 
+# WiFi credentials (user-specific)
+data/wifi.cfg
+
 # Compiled
 *.o
 *.a
@@ -27,3 +30,5 @@ Thumbs.db
 *.hex
 *.map
 
+# Credentials
+data/wifi.cfg

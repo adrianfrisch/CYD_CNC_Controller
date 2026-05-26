@@ -8,6 +8,7 @@
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <SD.h>
+#include <SPIFFS.h>
 
 WebUploadServer webServer;
 
@@ -103,11 +104,18 @@ loadFiles();
 )rawliteral";
 
 void WebUploadServer::begin() {
+    // Load WiFi credentials from SD card, fall back to compiled defaults
+    if (!loadWiFiConfig()) {
+        _ssid = WIFI_SSID;
+        _password = WIFI_PASSWORD;
+        Serial.println("[WEB] Using compiled WiFi credentials (no wifi.cfg found)");
+    }
+
     // Connect to WiFi network in station mode
     if (connectWiFi()) {
-        Serial.printf("[WEB] Connected to %s  IP: %s\n", WIFI_SSID, WiFi.localIP().toString().c_str());
+        Serial.printf("[WEB] Connected to %s  IP: %s\n", _ssid.c_str(), WiFi.localIP().toString().c_str());
     } else {
-        Serial.printf("[WEB] Failed to connect to %s — web upload unavailable\n", WIFI_SSID);
+        Serial.printf("[WEB] Failed to connect to %s — web upload unavailable\n", _ssid.c_str());
         Serial.println("[WEB] Will retry in background...");
     }
 
@@ -183,13 +191,60 @@ void WebUploadServer::loop() {
     }
 }
 
+bool WebUploadServer::loadWiFiConfig() {
+    if (!SPIFFS.begin(true)) {
+        Serial.println("[WEB] SPIFFS mount failed");
+        return false;
+    }
+
+    if (!SPIFFS.exists(WIFI_CONFIG_FILE)) {
+        Serial.println("[WEB] No wifi.cfg in flash (upload with: pio run -t uploadfs)");
+        return false;
+    }
+
+    File f = SPIFFS.open(WIFI_CONFIG_FILE, "r");
+    if (!f) {
+        Serial.println("[WEB] Failed to open wifi.cfg");
+        return false;
+    }
+
+    String ssid, pass;
+    while (f.available()) {
+        String line = f.readStringUntil('\n');
+        line.trim();
+        if (line.length() == 0 || line.startsWith("#")) continue;
+
+        int eq = line.indexOf('=');
+        if (eq < 0) continue;
+
+        String key = line.substring(0, eq);
+        String val = line.substring(eq + 1);
+        key.trim();
+        val.trim();
+
+        if (key == "SSID") ssid = val;
+        else if (key == "PASS") pass = val;
+    }
+    f.close();
+
+    if (ssid.length() == 0) {
+        Serial.println("[WEB] wifi.cfg: SSID is empty");
+        return false;
+    }
+
+    _ssid = ssid;
+    _password = pass;
+    Serial.printf("[WEB] Loaded wifi.cfg: SSID='%s'\n", _ssid.c_str());
+    return true;
+}
+
 bool WebUploadServer::connectWiFi() {
     _lastReconnectAttempt = millis();
     WiFi.mode(WIFI_STA);
     WiFi.setHostname(WIFI_HOSTNAME);
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    WiFi.begin(_ssid.c_str(), _password.c_str());
 
-    Serial.printf("[WEB] Connecting to WiFi '%s'...", WIFI_SSID);
+    Serial.printf("[WEB] Connecting to WiFi '%s'...", _ssid.c_str());
     unsigned long start = millis();
     while (WiFi.status() != WL_CONNECTED && (millis() - start) < WIFI_CONNECT_TIMEOUT_MS) {
         delay(250);

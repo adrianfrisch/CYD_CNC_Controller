@@ -1,6 +1,6 @@
 #pragma once
 // =============================================================================
-// Touch Calibration Screen — guided 4-corner calibration using TFT_eSPI
+// Touch Calibration Screen — 2-point calibration using XPT2046_Touchscreen
 // =============================================================================
 
 #include "ui_manager.h"
@@ -12,8 +12,9 @@ public:
     void update() override;
     void onTouch(int16_t x, int16_t y) override;
 
-    // The actual calibration runs inside enter() using TFT_eSPI's calibrateTouch()
-    // which blocks until all 4 corners are touched. After that, the results are
-    // saved to SD and the screen navigates to FileBrowser.
+private:
+    // Collect a raw touch point, blocking until the user touches and releases.
+    // Draws a crosshair at (screenX, screenY) and returns the raw XPT2046 values.
+    bool collectPoint(int screenX, int screenY, int16_t& rawX, int16_t& rawY);
+    void drawCrosshair(int x, int y, uint16_t color);
 };
-

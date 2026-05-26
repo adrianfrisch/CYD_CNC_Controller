@@ -22,6 +22,10 @@ void UIManager::begin() {
     pinMode(TFT_BACKLIGHT_PIN, OUTPUT);
     digitalWrite(TFT_BACKLIGHT_PIN, HIGH);
 
+    // Initialize touch (software SPI — avoids HSPI conflict with SD card)
+    _touch.begin();
+    Serial.println("[UI] XPT2046 touch initialized (software SPI)");
+
     // Create screens
     _screens[(int)ScreenId::FileBrowser] = new FileBrowserScreen();
     _screens[(int)ScreenId::Preview]     = new PreviewScreen();
@@ -41,14 +45,14 @@ void UIManager::begin() {
 
 void UIManager::loop() {
     // Touch handling
-    uint16_t tx, ty;
-    bool pressed = _tft.getTouch(&tx, &ty);
+    int16_t sx, sy;
+    bool pressed = getTouch(sx, sy);
 
     if (pressed && !_touched && (millis() - _lastTouch > TOUCH_DEBOUNCE_MS)) {
         _touched = true;
         _lastTouch = millis();
         if (_current) {
-            _current->onTouch((int16_t)tx, (int16_t)ty);
+            _current->onTouch(sx, sy);
         }
     }
     if (!pressed) {
@@ -70,6 +74,37 @@ void UIManager::switchScreen(ScreenId id) {
     _current->enter();
     _current->draw();
     Serial.printf("[UI] Switched to screen %d\n", idx);
+}
+
+// ---------------------------------------------------------------------------
+// Touch — raw access (for calibration)
+// ---------------------------------------------------------------------------
+
+bool UIManager::getRawTouch(int16_t& rawX, int16_t& rawY) {
+    return _touch.readRaw(rawX, rawY);
+}
+
+// ---------------------------------------------------------------------------
+// Touch — calibrated screen coordinates
+// ---------------------------------------------------------------------------
+
+bool UIManager::getTouch(int16_t& screenX, int16_t& screenY) {
+    int16_t rawX, rawY;
+    if (!getRawTouch(rawX, rawY)) return false;
+
+    // Map raw touch values to screen coordinates
+    int32_t sx = (int32_t)(rawX - _cal.rawXMin) * SCREEN_W / (_cal.rawXMax - _cal.rawXMin);
+    int32_t sy = (int32_t)(rawY - _cal.rawYMin) * SCREEN_H / (_cal.rawYMax - _cal.rawYMin);
+
+    // Clamp to screen bounds
+    if (sx < 0) sx = 0;
+    if (sx >= SCREEN_W) sx = SCREEN_W - 1;
+    if (sy < 0) sy = 0;
+    if (sy >= SCREEN_H) sy = SCREEN_H - 1;
+
+    screenX = (int16_t)sx;
+    screenY = (int16_t)sy;
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -116,8 +151,7 @@ bool UIManager::hitTest(int16_t tx, int16_t ty, const Button& btn) {
 bool UIManager::loadCalibration() {
     if (!sdCard.isReady()) {
         Serial.println("[UI] SD not ready — using default calibration");
-        uint16_t calData[5] = {300, 3600, 300, 3600, 1};
-        _tft.setTouch(calData);
+        _calibrated = false;
         return true; // Use defaults, don't force calibration without SD
     }
 
@@ -128,23 +162,23 @@ bool UIManager::loadCalibration() {
     File f = SD.open(TOUCH_CAL_FILE, FILE_READ);
     if (!f) return false;
 
-    uint16_t calData[5];
-    size_t bytesRead = f.read((uint8_t*)calData, sizeof(calData));
+    TouchCalData cal;
+    size_t bytesRead = f.read((uint8_t*)&cal, sizeof(cal));
     f.close();
 
-    if (bytesRead != sizeof(calData)) {
+    if (bytesRead != sizeof(cal) || cal.magic != TOUCH_CAL_MAGIC) {
         Serial.println("[UI] Calibration file corrupt — recalibrating");
         SD.remove(TOUCH_CAL_FILE);
         return false;
     }
 
-    _tft.setTouch(calData);
-    Serial.printf("[UI] Calibration loaded: %u %u %u %u %u\n",
-                  calData[0], calData[1], calData[2], calData[3], calData[4]);
+    applyCalibration(cal);
+    Serial.printf("[UI] Calibration loaded: X[%d..%d] Y[%d..%d]\n",
+                  _cal.rawXMin, _cal.rawXMax, _cal.rawYMin, _cal.rawYMax);
     return true;
 }
 
-void UIManager::saveCalibration(uint16_t calData[5]) {
+void UIManager::saveCalibration(const TouchCalData& cal) {
     if (!sdCard.isReady()) {
         Serial.println("[UI] SD not ready — calibration NOT saved");
         return;
@@ -156,17 +190,17 @@ void UIManager::saveCalibration(uint16_t calData[5]) {
         return;
     }
 
-    f.write((uint8_t*)calData, 5 * sizeof(uint16_t));
+    f.write((uint8_t*)&cal, sizeof(cal));
     f.close();
-    Serial.printf("[UI] Calibration saved: %u %u %u %u %u\n",
-                  calData[0], calData[1], calData[2], calData[3], calData[4]);
+    Serial.printf("[UI] Calibration saved: X[%d..%d] Y[%d..%d]\n",
+                  cal.rawXMin, cal.rawXMax, cal.rawYMin, cal.rawYMax);
 }
 
-void UIManager::applyCalibration(uint16_t calData[5]) {
-    _tft.setTouch(calData);
+void UIManager::applyCalibration(const TouchCalData& cal) {
+    _cal = cal;
+    _calibrated = true;
 }
 
 void UIManager::runCalibration() {
     switchScreen(ScreenId::Calibration);
 }
-

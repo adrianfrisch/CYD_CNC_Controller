@@ -28,13 +28,31 @@
 #define TFT_BACKLIGHT_PIN 21
 
 // -----------------------------------------------------------------------------
-// Touch (XPT2046 on separate SPI — handled by TFT_eSPI build flags)
+// Touch (XPT2046 on separate SPI bus from display)
 // -----------------------------------------------------------------------------
+#define TOUCH_CS_PIN      33
+#define TOUCH_IRQ_PIN     36
+#define TOUCH_MOSI_PIN    32
+#define TOUCH_MISO_PIN    39
+#define TOUCH_CLK_PIN     25
 #define TOUCH_CAL_FILE    "/touch_cal.dat"   // Calibration data file on SD card
+
+// Calibration data: maps raw touch coordinates to screen pixels
+struct TouchCalData {
+    int16_t rawXMin;   // Raw X at screen left
+    int16_t rawXMax;   // Raw X at screen right
+    int16_t rawYMin;   // Raw Y at screen top
+    int16_t rawYMax;   // Raw Y at screen bottom
+    uint32_t magic;    // Validation marker (0xCAL1)
+};
+#define TOUCH_CAL_MAGIC  0x43414C31  // "CAL1"
 
 // -----------------------------------------------------------------------------
 // WiFi — Station mode (connect to existing network)
+// Credentials are loaded from /wifi.cfg on the SD card at boot.
+// The defines below are compile-time fallbacks only.
 // -----------------------------------------------------------------------------
+#define WIFI_CONFIG_FILE  "/wifi.cfg"
 #define WIFI_SSID         "YOUR_WIFI_SSID"
 #define WIFI_PASSWORD     "YOUR_WIFI_PASSWORD"
 #define WIFI_HOSTNAME     "cyd-cnc"

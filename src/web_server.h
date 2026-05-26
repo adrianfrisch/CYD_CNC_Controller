@@ -14,10 +14,13 @@ public:
     bool isConnected() const;
 
 private:
+    bool loadWiFiConfig();   // Load SSID/PASS from /wifi.cfg on SD
     bool connectWiFi();
 
     bool _running = false;
     unsigned long _lastReconnectAttempt = 0;
+    String _ssid;
+    String _password;
 };
 
 extern WebUploadServer webServer;

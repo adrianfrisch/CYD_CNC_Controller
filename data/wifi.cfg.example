@@ -1,0 +1,11 @@
+# CYD CNC Controller — WiFi Configuration
+# ==========================================
+# Copy this file to data/wifi.cfg and edit the values below.
+# Then upload to the CYD with: pio run -t uploadfs
+#
+# Lines starting with # are comments and are ignored.
+# Do NOT use quotes around values.
+
+SSID=YOUR_WIFI_SSID
+PASS=YOUR_WIFI_PASSWORD
+

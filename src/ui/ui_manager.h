@@ -5,6 +5,7 @@
 
 #include <Arduino.h>
 #include <TFT_eSPI.h>
+#include "xpt2046_soft.h"
 #include "config.h"
 
 // Forward declarations
@@ -50,10 +51,15 @@ public:
     ScreenId currentScreenId() const { return _currentId; }
 
     // Touch calibration
-    bool loadCalibration();                         // Load from SD card
-    void saveCalibration(uint16_t calData[5]);      // Save to SD card
-    void applyCalibration(uint16_t calData[5]);     // Apply to TFT_eSPI
-    void runCalibration();                          // Switch to calibration screen
+    bool loadCalibration();
+    void saveCalibration(const TouchCalData& cal);
+    void applyCalibration(const TouchCalData& cal);
+    void runCalibration();
+
+    // Raw touch access (for calibration screen)
+    bool getRawTouch(int16_t& rawX, int16_t& rawY);
+    // Mapped touch (applies calibration)
+    bool getTouch(int16_t& screenX, int16_t& screenY);
 
     // Drawing helpers
     static void drawButton(TFT_eSPI& tft, const Button& btn);
@@ -65,10 +71,15 @@ public:
 
 private:
     TFT_eSPI  _tft;
+    XPT2046_Soft _touch;
+
     static constexpr int NUM_SCREENS = (int)ScreenId::_COUNT;
     Screen*   _screens[NUM_SCREENS] = {};
     Screen*   _current = nullptr;
     ScreenId  _currentId = ScreenId::FileBrowser;
+
+    TouchCalData _cal = {200, 3700, 200, 3700, 0};  // defaults
+    bool _calibrated = false;
 
     unsigned long _lastTouch = 0;
     bool     _touched = false;
