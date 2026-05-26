@@ -13,6 +13,23 @@ Upload GCode files over WiFi, preview them on the touchscreen, and run jobs — 
 > Do **not** use this to control a real CNC machine at this stage — you risk damage
 > to your equipment or injury. Use at your own risk.
 
+## Current status of the project
+I am currently testing the controller with my GRBL firmware based eggbot before moving on to my real CNC. 
+I successfully ran a couple of .nc files successfully. But test and use at your own risk. 
+The configuration for your CYD needs to be adjusted in the platformio.ini file to match your model. 
+
+--- 
+
+## Know Issues
+- On the jog display, the set Zero and return to zero commands do not work
+- Home is untested. My CNC machine does not support homing
+- The Z-Axis stepping to find the Z zero position is far too small (for metric). Change for .05 or so
+- After stopping a job in the job screen, the jog and starting another job does not work.
+
+## Improvement ideas
+- Also add buttons on the jog screen for diagonal movements
+- Support other screen sizes & resolutions
+
 ---
 
 ## Features
@@ -45,28 +62,28 @@ Upload GCode files over WiFi, preview them on the touchscreen, and run jobs — 
 ### Wiring Diagram
 
 ```
-                            ┌─────────────────────────────────────────────────┐
+                            ┌────────────────────────────────────────────────┐
   ┌─────────────────────┐   │  Arduino CNC Shield v3.0                       │
   │  CYD ESP32-2432S028 │   │  (plugged on top of Arduino Uno)               │
-  │                     │   │                                                 │
+  │                     │   │                                                │
   │  ┌───────────────┐  │   │  Stepper Drivers    12-36V                     │
-  │  │  2.8" TFT     │  │   │  ┌───┐ ┌───┐ ┌───┐  ↓                        │
-  │  │  Touchscreen  │  │   │  │ X │ │ Y │ │ Z │ [PWR]                      │
-  │  │  320×240      │  │   │  └─┬─┘ └─┬─┘ └─┬─┘                           │
+  │  │  2.8" TFT     │  │   │  ┌───┐ ┌───┐ ┌───┐  ↓                          │
+  │  │  Touchscreen  │  │   │  │ X │ │ Y │ │ Z │ [PWR]                       │
+  │  │  320×240      │  │   │  └─┬─┘ └─┬─┘ └─┬─┘                             │
   │  └───────────────┘  │   │    │      │      │   To stepper motors         │
-  │                     │   ├────┴──────┴──────┴──────────────────────────────┤
+  │                     │   ├────┴──────┴──────┴─────────────────────────────┤
   │  [USB-C]  [SD Card] │   │  Arduino Uno R3 (GRBL 1.1)                     │
-  │   Power    GCode    │   │                                                 │
-  │   & Flash  Storage  │   │  [USB-B]                                        │
-  │                     │   │   Power & Flash                                 │
-  │  P3 / CN1 Header:   │   │                                                 │
-  │  ┌─────────────┐    │   │   Pin Header:                                   │
-  │  │ GND         │────────────│ GND                                         │
-  │  │ GPIO 27 (TX)│────────────│ D0 (RX)                                     │
-  │  │ GPIO 22 (RX)│────────────│ D1 (TX)                                     │
-  │  │ 3V3         │    │   │   │                                             │
-  │  └─────────────┘    │   │   │                                             │
-  └─────────────────────┘   └───┴─────────────────────────────────────────────┘
+  │   Power    GCode    │   │                                                │
+  │   & Flash  Storage  │   │  [USB-B]                                       │
+  │                     │   │   Power & Flash                                │
+  │  P3 / CN1 Header:   │   │                                                │
+  │  ┌─────────────┐    │   │   Pin Header:                                  │
+  │  │ GND         │────────────│ GND                                        │
+  │  │ GPIO 27 (TX)│────────────│ D0 (RX)                                    │
+  │  │ GPIO 22 (RX)│────────────│ D1 (TX)                                    │
+  │  │ 3V3         │    │   │   │                                            │
+  │  └─────────────┘    │   │   │                                            │
+  └─────────────────────┘   └───┴────────────────────────────────────────────┘
          ↑                         ↑                    ↑
       5V USB-C                  5V USB-B            12-36V PSU
       (phone charger)          (or USB hub)         (motor power)
@@ -87,18 +104,18 @@ The CNC Shield sits on top of the Arduino Uno, but the serial pins **D0** and **
 ```
   Arduino Uno (bottom board) — Pin header along the edge:
 
-  ┌──────────────────────────────────────────────────────┐
-  │  DIGITAL PINS                                        │
+  ┌─────────────────────────────────────────────────────┐
+  │  DIGITAL PINS                                       │
   │  ┌────┬────┬────┬────┬────┬────┬────┬────┬────┐     │
   │  │ D0 │ D1 │ D2 │ D3 │ D4 │ D5 │ D6 │ D7 │ ...│     │
   │  │ RX │ TX │    │    │    │    │    │    │    │     │
   │  └──┬─┴──┬─┴────┴────┴────┴────┴────┴────┴────┘     │
-  │     │    │                                           │
+  │     │    │                                          │
   │     │    └── Green wire ← CYD GPIO 22 (RX)          │
   │     └─────── Yellow wire ← CYD GPIO 27 (TX)         │
-  │                                                      │
+  │                                                     │
   │  GND pin (next to 5V in POWER header) ← Black wire  │
-  └──────────────────────────────────────────────────────┘
+  └─────────────────────────────────────────────────────┘
 ```
 
 > **⚠ Important:** The CNC Shield passes through D0/D1 — if the shield's pin headers block access, solder wires directly to the Arduino D0/D1 pins underneath, or use the exposed serial header on some CNC Shield v3 boards.
@@ -186,6 +203,12 @@ File Browser  ──OPEN──→  Preview  ──START──→  Job
      ↕ JOG / FILES                    FILES ────┘
    Jog Control                   (when job idle)
 ```
+
+### File Upload
+
+ - The file browser shows the IP of the device on your local network
+ - open https://YOU_IP/ in your browser.
+ - The file upload page is pretty simple and should be self explanatory
 
 ### File Browser
 
