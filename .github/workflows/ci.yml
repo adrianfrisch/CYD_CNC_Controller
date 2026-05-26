@@ -1,0 +1,76 @@
+# GitHub Actions CI for CYD CNC Controller
+# Runs native unit tests on every push and PR
+
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install PlatformIO
+      run: |
+        python -m pip install --upgrade pip
+        pip install platformio
+
+    - name: Run native unit tests
+      run: |
+        pio test -e native -v
+
+    - name: Test Summary
+      if: always()
+      run: |
+        echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "All native unit tests completed" >> $GITHUB_STEP_SUMMARY
+
+  build:
+    name: Build Firmware
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install PlatformIO
+      run: |
+        python -m pip install --upgrade pip
+        pip install platformio
+
+    - name: Build ESP32 firmware
+      run: |
+        pio run -e esp32-2432S028R
+
+    - name: Report build size
+      run: |
+        echo "## Build Size" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        pio run -e esp32-2432S028R -t size 2>&1 | grep -E "(RAM|Flash|Program)" >> $GITHUB_STEP_SUMMARY || true
+        echo '```' >> $GITHUB_STEP_SUMMARY
+
+    - name: Upload firmware artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: firmware
+        path: .pio/build/esp32-2432S028R/firmware.bin
+        retention-days: 7
+
