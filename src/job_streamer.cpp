@@ -41,6 +41,7 @@ void JobStreamer::loop() {
     if (!readNextLine()) {
         // File finished
         _state = JobState::Completed;
+        _endTime = millis();
         _file.close();
         Serial.println("[JOB] Completed");
         if (_doneCb) _doneCb(true);
@@ -70,6 +71,7 @@ bool JobStreamer::startJob(const char* filePath) {
     // No full-file scan — progress is byte-based (_bytesRead / _fileSize)
 
     _startTime = millis();
+    _endTime = 0;
     _state = JobState::Running;
 
     // Read first line
@@ -99,6 +101,7 @@ void JobStreamer::stop() {
     if (_state == JobState::Running || _state == JobState::Paused) {
         grbl.softReset();
         _state = JobState::Idle;
+        _endTime = millis();
         _waitingForOk = false;
         _file.close();
         Serial.println("[JOB] Stopped");
@@ -112,7 +115,10 @@ int JobStreamer::percentComplete() const {
 }
 
 unsigned long JobStreamer::elapsedMs() const {
-    if (_state == JobState::Idle) return 0;
+    if (_state == JobState::Idle && _endTime == 0) return 0;
+    // If job finished (completed/stopped), return frozen time
+    if (_endTime > 0) return _endTime - _startTime;
+    // Still running or paused
     return millis() - _startTime;
 }
 

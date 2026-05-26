@@ -57,6 +57,7 @@ private:
     char     _currentCmd[GCODE_LINE_MAX] = {};
 
     unsigned long _startTime = 0;
+    unsigned long _endTime = 0;  // Set when job completes/stops
     bool     _waitingForOk = false;
     unsigned long _cmdSentTime = 0;
 

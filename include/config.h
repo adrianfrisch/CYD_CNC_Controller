@@ -14,8 +14,8 @@
 //   and the simulator ignores lines starting with '['.
 //   Set both to 0 for production with a real CNC machine.
 // -----------------------------------------------------------------------------
-#define DEVELOP_MODE          1
-#define DEBUG_SERIAL_GRBL     1
+#define DEVELOP_MODE          0
+#define DEBUG_SERIAL_GRBL     0
 
 // Debug logging macros (active only in DEVELOP_MODE)
 #if DEVELOP_MODE
