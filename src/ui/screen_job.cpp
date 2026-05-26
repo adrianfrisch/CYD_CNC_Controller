@@ -1,5 +1,6 @@
 // =============================================================================
 // Job Execution Screen — Implementation
+// Only redraws UI elements whose underlying data actually changed.
 // =============================================================================
 
 #include "screen_job.h"
@@ -9,8 +10,15 @@
 extern char g_selectedFile[];
 
 void JobScreen::enter() {
-    _lastPercent = -1;
     _lastUpdate = 0;
+    // Invalidate all cached values to force full draw
+    _prevPct = -1;
+    _prevX = _prevY = _prevZ = -9999;
+    _prevGrblState = _prevJobState = -1;
+    _prevFeed = _prevSpindle = -1;
+    _prevLine = -1;
+    _prevElapsed = _prevRemaining = 0;
+    _prevGCode[0] = '\0';
 }
 
 void JobScreen::draw() {
@@ -19,15 +27,15 @@ void JobScreen::draw() {
 
     tft.setTextSize(1);
 
-    // File name
+    // File name (static — only drawn once)
     tft.setTextColor(CLR_ACCENT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
     tft.drawString(g_selectedFile, 4, 34);
 
     // Progress bar outline
-    UIManager::drawProgressBar(tft, 4, 48, 312, 16, 0, CLR_PROGRESS);
+    tft.drawRect(4, 48, 312, 16, CLR_BORDER);
 
-    // Control buttons at bottom
+    // Control buttons at bottom (static)
     Button btnPause  = {4,   210, 70, 26, CLR_BTN_WARN,   "PAUSE"};
     Button btnResume = {80,  210, 70, 26, CLR_BTN_ACTIVE,  "RESUME"};
     Button btnStop   = {156, 210, 70, 26, CLR_BTN_DANGER,  "STOP"};
@@ -38,101 +46,170 @@ void JobScreen::draw() {
     UIManager::drawButton(tft, btnStop);
     UIManager::drawButton(tft, btnBack);
 
-    drawStatus();
+    // Force-draw all dynamic fields
+    drawProgressBar();
+    drawPosition();
+    drawState();
+    drawFeedSpindle();
+    drawLine();
+    drawTime();
+    drawGCodeLine();
 }
 
-void JobScreen::drawStatus() {
-    TFT_eSPI& tft = ui.tft();
-    const GrblStatus& st = grbl.status();
+// --- Individual field draw methods (only redraw if value changed) ---
 
+void JobScreen::drawProgressBar() {
+    int pct = job.percentComplete();
+    if (pct == _prevPct) return;
+    _prevPct = pct;
+
+    TFT_eSPI& tft = ui.tft();
+    UIManager::drawProgressBar(tft, 4, 48, 312, 16, pct, CLR_PROGRESS);
+
+    char buf[8];
+    snprintf(buf, sizeof(buf), "%d%%", pct);
+    tft.setTextSize(1);
+    tft.setTextColor(CLR_TEXT, pct > 50 ? CLR_PROGRESS : CLR_BG);
+    tft.setTextDatum(MC_DATUM);
+    tft.drawString(buf, 160, 56);
+}
+
+void JobScreen::drawPosition() {
+    const GrblStatus& st = grbl.status();
+    // Compare with 0.005 tolerance to avoid float noise
+    if (fabsf(st.wposX - _prevX) < 0.005f &&
+        fabsf(st.wposY - _prevY) < 0.005f &&
+        fabsf(st.wposZ - _prevZ) < 0.005f) return;
+
+    _prevX = st.wposX;
+    _prevY = st.wposY;
+    _prevZ = st.wposZ;
+
+    TFT_eSPI& tft = ui.tft();
     tft.setTextSize(1);
     tft.setTextColor(CLR_TEXT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
 
-    // Progress
-    int pct = job.percentComplete();
-    UIManager::drawProgressBar(tft, 4, 48, 312, 16, pct, CLR_PROGRESS);
-
-    char buf[64];
-    snprintf(buf, sizeof(buf), "%d%%", pct);
-    tft.setTextColor(CLR_TEXT, pct > 50 ? CLR_PROGRESS : CLR_BG);
-    tft.setTextDatum(MC_DATUM);
-    tft.drawString(buf, 160, 56);
-
-    // Position
-    tft.setTextColor(CLR_TEXT, CLR_BG);
-    tft.setTextDatum(ML_DATUM);
-    snprintf(buf, sizeof(buf), "X: %7.2f  Y: %7.2f  Z: %7.2f", st.wposX, st.wposY, st.wposZ);
+    char buf[48];
+    snprintf(buf, sizeof(buf), "X:%7.2f  Y:%7.2f  Z:%7.2f  ", st.wposX, st.wposY, st.wposZ);
     tft.drawString(buf, 4, 76);
+}
 
-    // Status line
-    const char* stateNames[] = {"???", "Idle", "Run", "Hold", "Jog", "ALARM", "Door", "Check", "Home", "Sleep"};
-    int si = (int)st.state;
-    if (si < 0 || si > 9) si = 0;
-
-    const char* jobStates[] = {"Idle", "Running", "Paused", "Done", "Error"};
+void JobScreen::drawState() {
+    int si = (int)grbl.status().state;
     int ji = (int)job.state();
+    if (si == _prevGrblState && ji == _prevJobState) return;
+    _prevGrblState = si;
+    _prevJobState = ji;
+
+    const char* stateNames[] = {"???", "Idle", "Run", "Hold", "Jog", "ALARM", "Door", "Check", "Home", "Sleep"};
+    const char* jobStates[]  = {"Idle", "Running", "Paused", "Done", "Error"};
+    if (si < 0 || si > 9) si = 0;
     if (ji < 0 || ji > 4) ji = 0;
 
-    snprintf(buf, sizeof(buf), "GRBL: %-6s  Job: %-8s", stateNames[si], jobStates[ji]);
+    TFT_eSPI& tft = ui.tft();
+    tft.setTextSize(1);
+    tft.setTextColor(CLR_TEXT, CLR_BG);
+    tft.setTextDatum(ML_DATUM);
+
+    char buf[48];
+    snprintf(buf, sizeof(buf), "GRBL: %-6s  Job: %-8s  ", stateNames[si], jobStates[ji]);
     tft.drawString(buf, 4, 96);
+}
 
-    // Feed & spindle
-    snprintf(buf, sizeof(buf), "Feed: %d mm/min  Spindle: %d RPM", st.feedRate, st.spindleSpeed);
+void JobScreen::drawFeedSpindle() {
+    const GrblStatus& st = grbl.status();
+    if (st.feedRate == _prevFeed && st.spindleSpeed == _prevSpindle) return;
+    _prevFeed = st.feedRate;
+    _prevSpindle = st.spindleSpeed;
+
+    TFT_eSPI& tft = ui.tft();
+    tft.setTextSize(1);
+    tft.setTextColor(CLR_TEXT, CLR_BG);
+    tft.setTextDatum(ML_DATUM);
+
+    char buf[48];
+    snprintf(buf, sizeof(buf), "Feed: %d mm/min  Spindle: %d RPM   ", st.feedRate, st.spindleSpeed);
     tft.drawString(buf, 4, 116);
+}
 
-    // Line progress
-    snprintf(buf, sizeof(buf), "Line: %d / %d", job.currentLine(), job.totalLines());
+void JobScreen::drawLine() {
+    int line = job.currentLine();
+    if (line == _prevLine) return;
+    _prevLine = line;
+
+    TFT_eSPI& tft = ui.tft();
+    tft.setTextSize(1);
+    tft.setTextColor(CLR_TEXT, CLR_BG);
+    tft.setTextDatum(ML_DATUM);
+
+    char buf[32];
+    snprintf(buf, sizeof(buf), "Line: %d     ", line);
     tft.drawString(buf, 4, 136);
+}
 
-    // Time
+void JobScreen::drawTime() {
     unsigned long elapsed = job.elapsedMs() / 1000;
     unsigned long remaining = job.estimatedRemainingMs() / 1000;
-    snprintf(buf, sizeof(buf), "Elapsed: %02lu:%02lu  ETA: %02lu:%02lu",
+    if (elapsed == _prevElapsed && remaining == _prevRemaining) return;
+    _prevElapsed = elapsed;
+    _prevRemaining = remaining;
+
+    TFT_eSPI& tft = ui.tft();
+    tft.setTextSize(1);
+    tft.setTextColor(CLR_TEXT, CLR_BG);
+    tft.setTextDatum(ML_DATUM);
+
+    char buf[48];
+    snprintf(buf, sizeof(buf), "Elapsed: %02lu:%02lu  ETA: %02lu:%02lu   ",
              elapsed / 60, elapsed % 60, remaining / 60, remaining % 60);
     tft.drawString(buf, 4, 156);
-
-    drawGCodeLine();
 }
 
 void JobScreen::drawGCodeLine() {
-    TFT_eSPI& tft = ui.tft();
-    // Show current GCode line being sent
-    tft.fillRect(0, 176, SCREEN_W, 20, CLR_HEADER);
-    tft.setTextColor(CLR_ACCENT, CLR_HEADER);
-    tft.setTextDatum(ML_DATUM);
-
     char buf[54];
     snprintf(buf, sizeof(buf), "> %.50s", job.currentGCodeLine());
+    if (strcmp(buf, _prevGCode) == 0) return;
+    strncpy(_prevGCode, buf, sizeof(_prevGCode) - 1);
+
+    TFT_eSPI& tft = ui.tft();
+    tft.fillRect(0, 176, SCREEN_W, 20, CLR_HEADER);
+    tft.setTextSize(1);
+    tft.setTextColor(CLR_ACCENT, CLR_HEADER);
+    tft.setTextDatum(ML_DATUM);
     tft.drawString(buf, 4, 186);
 }
 
 void JobScreen::update() {
-    // Refresh display periodically
     unsigned long now = millis();
-    if (now - _lastUpdate < 500) return;
+
+    // GCode line — check every loop (changes per command)
+    drawGCodeLine();
+
+    // Other fields — check every 250ms
+    if (now - _lastUpdate < 250) return;
     _lastUpdate = now;
 
-    drawStatus();
+    drawProgressBar();
+    drawPosition();
+    drawState();
+    drawFeedSpindle();
+    drawLine();
+    drawTime();
 }
 
 void JobScreen::onTouch(int16_t x, int16_t y) {
     if (y < 210) return; // Only buttons at bottom
 
     if (x < 74) {
-        // PAUSE
         job.pause();
     } else if (x < 150) {
-        // RESUME
         job.resume();
     } else if (x < 226) {
-        // STOP
         job.stop();
     } else {
-        // FILES — back to file browser
         if (job.state() != JobState::Running) {
             ui.switchScreen(ScreenId::FileBrowser);
         }
     }
 }
-

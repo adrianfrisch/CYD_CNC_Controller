@@ -13,9 +13,9 @@ void JobStreamer::begin() {
     // Register a response callback so we can track ok/error from GRBL
     grbl.onResponse([](const char* line) {
         if (strcmp(line, "ok") == 0) {
-            if (job._pendingOks > 0) job._pendingOks--;
+            job._waitingForOk = false;
         } else if (strncmp(line, "error:", 6) == 0) {
-            if (job._pendingOks > 0) job._pendingOks--;
+            job._waitingForOk = false;
             Serial.printf("[JOB] GRBL error on line %d: %s\n", job._currentLine, line);
         }
     });
@@ -24,24 +24,27 @@ void JobStreamer::begin() {
 void JobStreamer::loop() {
     if (_state != JobState::Running) return;
 
-    // Stream lines as long as GRBL buffer has space
-    while (_state == JobState::Running && grbl.availableInBuffer() > (int)strlen(_currentCmd) + 1) {
-        if (_currentCmd[0] != '\0') {
-            grbl.sendLine(_currentCmd);
-            _pendingOks++;
-            _currentCmd[0] = '\0';
-        }
+    // Send-and-wait: only send next line after GRBL replied to the previous one
+    if (_waitingForOk) return;
 
-        if (!readNextLine()) {
-            // File finished — wait for remaining oks
-            if (_pendingOks <= 0) {
-                _state = JobState::Completed;
-                _file.close();
-                Serial.println("[JOB] Completed");
-                if (_doneCb) _doneCb(true);
-            }
-            return;
-        }
+    // If we have a command ready, send it
+    if (_currentCmd[0] != '\0') {
+        grbl.sendLine(_currentCmd);
+        _waitingForOk = true;
+        _cmdSentTime = millis();
+        DBG("JOB sent line %d: %s", _currentLine, _currentCmd);
+        _currentCmd[0] = '\0';
+        return; // Wait for ok before doing anything else
+    }
+
+    // Read next line from file
+    if (!readNextLine()) {
+        // File finished
+        _state = JobState::Completed;
+        _file.close();
+        Serial.println("[JOB] Completed");
+        if (_doneCb) _doneCb(true);
+        return;
     }
 }
 
@@ -61,17 +64,10 @@ bool JobStreamer::startJob(const char* filePath) {
     _fileSize = _file.size();
     _bytesRead = 0;
     _currentLine = 0;
-    _pendingOks = 0;
+    _waitingForOk = false;
     _currentCmd[0] = '\0';
 
-    // Count total lines for progress estimation
-    _totalLines = 0;
-    while (_file.available()) {
-        char c = _file.read();
-        if (c == '\n') _totalLines++;
-    }
-    if (_totalLines == 0) _totalLines = 1;
-    _file.seek(0);
+    // No full-file scan — progress is byte-based (_bytesRead / _fileSize)
 
     _startTime = millis();
     _state = JobState::Running;
@@ -79,7 +75,7 @@ bool JobStreamer::startJob(const char* filePath) {
     // Read first line
     readNextLine();
 
-    Serial.printf("[JOB] Started: %s (%d lines, %d bytes)\n", filePath, _totalLines, _fileSize);
+    Serial.printf("[JOB] Started: %s (%d bytes)\n", filePath, _fileSize);
     return true;
 }
 
@@ -103,7 +99,7 @@ void JobStreamer::stop() {
     if (_state == JobState::Running || _state == JobState::Paused) {
         grbl.softReset();
         _state = JobState::Idle;
-        _pendingOks = 0;
+        _waitingForOk = false;
         _file.close();
         Serial.println("[JOB] Stopped");
         if (_doneCb) _doneCb(false);

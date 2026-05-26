@@ -57,7 +57,8 @@ private:
     char     _currentCmd[GCODE_LINE_MAX] = {};
 
     unsigned long _startTime = 0;
-    int      _pendingOks = 0;
+    bool     _waitingForOk = false;
+    unsigned long _cmdSentTime = 0;
 
     JobDoneCb _doneCb = nullptr;
 };

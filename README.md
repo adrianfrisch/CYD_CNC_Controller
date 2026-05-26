@@ -280,6 +280,32 @@ Flash: [===       ]  28.7% (902 KB / 3,146 KB)
 
 ---
 
+## Testing with GRBL Simulator
+
+A Python-based GRBL simulator is included for testing without a real CNC machine.
+It simulates a GRBL 1.1 controller: acknowledges GCode commands, responds to status
+queries with simulated positions, and handles realtime commands.
+
+```bash
+# Install dependency (if needed)
+pip3 install pyserial
+
+# Run simulator on the serial port connected to the CYD
+python3 tools/grbl_simulator.py --port /dev/ttyUSB0 --baud 115200 --delay 0.2
+```
+
+**Options:**
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--port` | `/dev/ttyUSB0` | Serial port to listen on |
+| `--baud` | `115200` | Baud rate |
+| `--delay` | `0.2` | Seconds to wait before acknowledging each command |
+
+The simulator ignores ESP32 debug messages (lines starting with `[`) and only
+responds to valid GRBL commands.
+
+---
+
 ## Troubleshooting
 
 | Problem | Solution |

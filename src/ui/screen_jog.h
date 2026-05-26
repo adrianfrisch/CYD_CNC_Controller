@@ -22,6 +22,10 @@ private:
     int   _feedIdx = JOG_FEED_DEFAULT_IDX; // index into feed rates
     unsigned long _lastUpdate = 0;
 
+    // Cached values for dirty-checking
+    float _prevX = -9999, _prevY = -9999, _prevZ = -9999;
+    int   _prevState = -1;
+
     static constexpr float STEPS[] = {0.1f, 0.5f, 1.0f, 5.0f, 10.0f, 50.0f};
     static constexpr int NUM_STEPS = 6;
 

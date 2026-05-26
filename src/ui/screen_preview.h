@@ -19,7 +19,7 @@ private:
 
     char _lines[PREVIEW_LINES][80];
     int _lineCount = 0;
-    int _totalLines = 0;
+    bool _hasMore = false;
     size_t _fileSize = 0;
 };
 

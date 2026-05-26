@@ -8,13 +8,32 @@
 
 GrblComm grbl;
 
+// In DEBUG_SERIAL_GRBL mode, GRBL communication goes over USB Serial
+// instead of UART2. Debug log lines are prefixed with '[' so the
+// simulator can ignore them.
+#if DEBUG_SERIAL_GRBL
+  #define GRBL_PORT Serial
+#else
+  #define GRBL_PORT GRBL_SERIAL
+#endif
+
 void GrblComm::begin() {
-#if DEVELOP_MODE
+#if DEVELOP_MODE && !DEBUG_SERIAL_GRBL
+    // Pure develop mode — no serial, simulated state
     _connected = true;
     _status.state = GrblState::Idle;
     Serial.println("[GRBL] DEVELOP MODE — UART disabled, simulating Idle state");
+#elif DEBUG_SERIAL_GRBL
+    // Debug mode — GRBL comms over USB Serial (shared with debug output)
+    // Serial is already initialized by Arduino framework
+    _rxPos = 0;
+    _grblBufFree = GRBL_RX_BUFFER;
+    _sentHead = _sentTail = _sentCount = 0;
+    _connected = false;
+    Serial.println("[GRBL] DEBUG MODE — using USB Serial for GRBL communication");
+    Serial.println("[GRBL] Connect grbl_simulator.py to this port");
 #else
-    GRBL_SERIAL.begin(GRBL_BAUD_RATE, SERIAL_8N1, GRBL_RX_PIN, GRBL_TX_PIN);
+    GRBL_PORT.begin(GRBL_BAUD_RATE, SERIAL_8N1, GRBL_RX_PIN, GRBL_TX_PIN);
     _rxPos = 0;
     _grblBufFree = GRBL_RX_BUFFER;
     _sentHead = _sentTail = _sentCount = 0;
@@ -24,7 +43,7 @@ void GrblComm::begin() {
 }
 
 void GrblComm::loop() {
-#if DEVELOP_MODE
+#if DEVELOP_MODE && !DEBUG_SERIAL_GRBL
     // No serial processing — keep simulated state
     return;
 #else
@@ -41,7 +60,7 @@ void GrblComm::loop() {
     if (_connected && (now - _lastRx > 3000)) {
         _connected = false;
         _status.state = GrblState::Unknown;
-        Serial.println("[GRBL] Connection lost");
+        DBG("GRBL connection lost");
     }
 #endif
 }
@@ -52,29 +71,29 @@ void GrblComm::loop() {
 
 void GrblComm::sendLine(const char* cmd) {
     if (!cmd || cmd[0] == '\0') return;
-#if DEVELOP_MODE
+#if DEVELOP_MODE && !DEBUG_SERIAL_GRBL
     DBG("GRBL sendLine: %s", cmd);
 #else
     int len = strlen(cmd) + 1; // +1 for \n
 
     // Character-counting: track buffer usage
     if (_sentCount < GCODE_BUFFER_LINES && _grblBufFree >= len) {
-        GRBL_SERIAL.print(cmd);
-        GRBL_SERIAL.print('\n');
+        GRBL_PORT.print(cmd);
+        GRBL_PORT.print('\n');
         _sentLens[_sentHead] = len;
         _sentHead = (_sentHead + 1) % GCODE_BUFFER_LINES;
         _sentCount++;
         _grblBufFree -= len;
-        Serial.printf("[GRBL] >> %s (buf free: %d)\n", cmd, _grblBufFree);
+        DBG("GRBL >> %s (buf free: %d)", cmd, _grblBufFree);
     }
 #endif
 }
 
 void GrblComm::sendRealtime(char c) {
-#if DEVELOP_MODE
+#if DEVELOP_MODE && !DEBUG_SERIAL_GRBL
     DBG("GRBL realtime: 0x%02X", (int)c);
 #else
-    GRBL_SERIAL.write(c);
+    GRBL_PORT.write(c);
 #endif
 }
 
@@ -109,15 +128,23 @@ void GrblComm::goToZero() {
 // ---------------------------------------------------------------------------
 
 void GrblComm::processIncoming() {
-    while (GRBL_SERIAL.available()) {
-        char c = GRBL_SERIAL.read();
+    while (GRBL_PORT.available()) {
+        char c = GRBL_PORT.read();
         _lastRx = millis();
         _connected = true;
 
         if (c == '\n' || c == '\r') {
             if (_rxPos > 0) {
                 _rxBuf[_rxPos] = '\0';
+#if DEBUG_SERIAL_GRBL
+                // In debug mode, ignore our own debug output echoed back
+                // (lines starting with '[' are debug/log messages, not GRBL responses)
+                if (_rxBuf[0] != '[') {
+                    parseLine(_rxBuf);
+                }
+#else
                 parseLine(_rxBuf);
+#endif
                 _rxPos = 0;
             }
         } else if (_rxPos < sizeof(_rxBuf) - 1) {
@@ -127,7 +154,7 @@ void GrblComm::processIncoming() {
 }
 
 void GrblComm::parseLine(const char* line) {
-    Serial.printf("[GRBL] << %s\n", line);
+    DBG("GRBL << %s", line);
 
     if (line[0] == '<') {
         // Status report
@@ -152,13 +179,13 @@ void GrblComm::parseLine(const char* line) {
         Serial.printf("[GRBL] ERROR: %s\n", line);
     } else if (strncmp(line, "ALARM:", 6) == 0) {
         _status.state = GrblState::Alarm;
-        Serial.printf("[GRBL] ALARM: %s\n", line);
+        DBG("GRBL ALARM: %s", line);
     } else if (strncmp(line, "Grbl ", 5) == 0) {
         // GRBL startup message — reset buffer tracking
         _grblBufFree = GRBL_RX_BUFFER;
         _sentCount = 0;
         _sentHead = _sentTail = 0;
-        Serial.printf("[GRBL] Controller connected: %s\n", line);
+        DBG("GRBL Controller connected: %s", line);
     }
 
     if (_responseCb) _responseCb(line);

@@ -9,15 +9,44 @@
 // Shared selected file path (used by Preview & Job screens)
 char g_selectedFile[MAX_FILENAME] = {};
 
+// Compute a simple fingerprint from file count and sizes
+static int computeFingerprint(const FileInfo* files, int count) {
+    int fp = count * 31;
+    for (int i = 0; i < count; i++) {
+        fp = fp * 37 + (int)(files[i].size & 0x7FFFFFFF);
+        // Mix in first char of filename for extra uniqueness
+        fp = fp * 17 + files[i].name[0];
+    }
+    return fp;
+}
+
 void FileBrowserScreen::enter() {
     _page = 0;
     _selectedIndex = -1;
+    _confirmDelete = false;
+    _lastCheck = 0;
+    _fingerprint = 0;
     refreshFiles();
 }
 
 void FileBrowserScreen::refreshFiles() {
     _fileCount = sdCard.listGCodeFiles("/", _files, MAX_FILES);
+    _fingerprint = computeFingerprint(_files, _fileCount);
     _needsRedraw = true;
+}
+
+bool FileBrowserScreen::checkForChanges() {
+    FileInfo tempFiles[MAX_FILES];
+    int count = sdCard.listGCodeFiles("/", tempFiles, MAX_FILES);
+    int fp = computeFingerprint(tempFiles, count);
+    if (fp != _fingerprint) {
+        // Copy new data
+        memcpy(_files, tempFiles, sizeof(tempFiles));
+        _fileCount = count;
+        _fingerprint = fp;
+        return true;
+    }
+    return false;
 }
 
 // Button column starts at x=220 (wider buttons, easier to hit)
@@ -59,20 +88,20 @@ void FileBrowserScreen::draw() {
     tft.setTextDatum(MR_DATUM);
     tft.drawString("[CAL]", SCREEN_W - 4, 230);
 
-    // Right-side buttons (wider, easier to touch)
+    // Right-side buttons — no more RFSH, DEL takes its spot
     Button btnJog   = {BTN_X, 28,  BTN_W, BTN_H, CLR_BTN,        "JOG"};
     Button btnUp    = {BTN_X, 62,  BTN_W, BTN_H, CLR_BTN,        "UP"};
     Button btnDown  = {BTN_X, 96,  BTN_W, BTN_H, CLR_BTN,        "DOWN"};
-    Button btnOpen  = {BTN_X, 132, BTN_W, BTN_H, CLR_BTN_ACTIVE, "OPEN",  _selectedIndex >= 0};
-    Button btnDel   = {BTN_X, 166, BTN_W, BTN_H, CLR_BTN_DANGER, "DEL",   _selectedIndex >= 0};
-    Button btnRefr  = {BTN_X, 200, 46, 18, CLR_BTN_WARN,         "RFSH"};
+    Button btnOpen  = {BTN_X, 130, BTN_W, BTN_H, CLR_BTN_ACTIVE, "OPEN",  _selectedIndex >= 0};
+    Button btnDel   = {BTN_X, 168, BTN_W, BTN_H, CLR_BTN_DANGER,
+                       _confirmDelete ? "CONFIRM?" : "DEL",
+                       _selectedIndex >= 0};
 
     UIManager::drawButton(tft, btnJog);
     UIManager::drawButton(tft, btnUp);
     UIManager::drawButton(tft, btnDown);
     UIManager::drawButton(tft, btnOpen);
     UIManager::drawButton(tft, btnDel);
-    UIManager::drawButton(tft, btnRefr);
 
     drawFileList();
 }
@@ -129,6 +158,18 @@ void FileBrowserScreen::update() {
         _needsRedraw = false;
         draw();
     }
+
+    // Auto-refresh: check SD card every 2 seconds
+    unsigned long now = millis();
+    if (now - _lastCheck >= 2000) {
+        _lastCheck = now;
+        if (sdCard.isReady() && checkForChanges()) {
+            DBG("File browser: SD contents changed, refreshing");
+            _selectedIndex = -1;
+            _confirmDelete = false;
+            _needsRedraw = true;
+        }
+    }
 }
 
 void FileBrowserScreen::onTouch(int16_t x, int16_t y) {
@@ -138,6 +179,7 @@ void FileBrowserScreen::onTouch(int16_t x, int16_t y) {
         int idx = _page * FILES_PER_PAGE + row;
         if (idx < _fileCount) {
             _selectedIndex = (_selectedIndex == idx) ? -1 : idx; // toggle
+            _confirmDelete = false;
             Serial.printf("[FB] Selected file %d: %s\n", idx, _files[idx].name);
             _needsRedraw = true;
         }
@@ -151,27 +193,32 @@ void FileBrowserScreen::onTouch(int16_t x, int16_t y) {
             ui.switchScreen(ScreenId::Jog);
         } else if (y >= 58 && y < 92) {
             // UP (previous page)
-            if (_page > 0) { _page--; _selectedIndex = -1; _needsRedraw = true; }
-        } else if (y >= 92 && y < 128) {
+            if (_page > 0) { _page--; _selectedIndex = -1; _confirmDelete = false; _needsRedraw = true; }
+        } else if (y >= 92 && y < 126) {
             // DOWN (next page)
             int totalPages = (_fileCount + FILES_PER_PAGE - 1) / FILES_PER_PAGE;
-            if (_page < totalPages - 1) { _page++; _selectedIndex = -1; _needsRedraw = true; }
-        } else if (y >= 128 && y < 162 && _selectedIndex >= 0) {
+            if (_page < totalPages - 1) { _page++; _selectedIndex = -1; _confirmDelete = false; _needsRedraw = true; }
+        } else if (y >= 126 && y < 164 && _selectedIndex >= 0) {
             // OPEN — go to preview screen
             Serial.printf("[FB] Opening: %s\n", _files[_selectedIndex].name);
             snprintf(g_selectedFile, MAX_FILENAME, "/%s", _files[_selectedIndex].name);
+            _confirmDelete = false;
             ui.switchScreen(ScreenId::Preview);
-        } else if (y >= 162 && y < 196 && _selectedIndex >= 0) {
-            // DELETE
-            char path[MAX_FILENAME + 2];
-            snprintf(path, sizeof(path), "/%s", _files[_selectedIndex].name);
-            Serial.printf("[FB] Deleting: %s\n", path);
-            sdCard.remove(path);
-            _selectedIndex = -1;
-            refreshFiles();
-        } else if (y >= 196 && y < 220) {
-            // REFRESH
-            refreshFiles();
+        } else if (y >= 164 && y < 200 && _selectedIndex >= 0) {
+            // DELETE — requires confirmation
+            if (_confirmDelete) {
+                char path[MAX_FILENAME + 2];
+                snprintf(path, sizeof(path), "/%s", _files[_selectedIndex].name);
+                Serial.printf("[FB] Deleting: %s\n", path);
+                sdCard.remove(path);
+                _selectedIndex = -1;
+                _confirmDelete = false;
+                refreshFiles();
+            } else {
+                Serial.printf("[FB] Delete requested — tap again to confirm\n");
+                _confirmDelete = true;
+                _needsRedraw = true;
+            }
         }
     }
 

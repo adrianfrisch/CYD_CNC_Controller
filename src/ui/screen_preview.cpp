@@ -12,7 +12,6 @@ void PreviewScreen::enter() {
 
 void PreviewScreen::loadPreview() {
     _lineCount = 0;
-    _totalLines = 0;
     memset(_lines, 0, sizeof(_lines));
 
     File f = sdCard.openFile(g_selectedFile);
@@ -20,7 +19,7 @@ void PreviewScreen::loadPreview() {
 
     _fileSize = f.size();
 
-    // Read first PREVIEW_LINES non-empty lines
+    // Read first PREVIEW_LINES non-empty lines only — do NOT scan entire file
     char buf[256];
     while (f.available() && _lineCount < PREVIEW_LINES) {
         int i = 0;
@@ -31,7 +30,6 @@ void PreviewScreen::loadPreview() {
             buf[i++] = c;
         }
         buf[i] = '\0';
-        _totalLines++;
 
         if (i > 0) {
             strncpy(_lines[_lineCount], buf, 79);
@@ -40,11 +38,7 @@ void PreviewScreen::loadPreview() {
         }
     }
 
-    // Count remaining lines
-    while (f.available()) {
-        char c = f.read();
-        if (c == '\n') _totalLines++;
-    }
+    _hasMore = f.available();
     f.close();
 }
 
@@ -54,12 +48,17 @@ void PreviewScreen::draw() {
 
     tft.setTextSize(1);
 
-    // File info
+    // File info — size only (no slow full-file scan)
     tft.setTextColor(CLR_ACCENT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
     char info[64];
-    snprintf(info, sizeof(info), "%s  (%d lines, %d bytes)", g_selectedFile, _totalLines,
-             (int)_fileSize);
+    if (_fileSize > 1024 * 1024) {
+        snprintf(info, sizeof(info), "%s  (%.1f MB)", g_selectedFile, _fileSize / 1048576.0f);
+    } else if (_fileSize > 1024) {
+        snprintf(info, sizeof(info), "%s  (%.1f KB)", g_selectedFile, _fileSize / 1024.0f);
+    } else {
+        snprintf(info, sizeof(info), "%s  (%d B)", g_selectedFile, (int)_fileSize);
+    }
     tft.drawString(info, 4, 34);
 
     // Preview lines
@@ -69,11 +68,9 @@ void PreviewScreen::draw() {
         snprintf(lineDisp, sizeof(lineDisp), "%3d: %.42s", i + 1, _lines[i]);
         tft.drawString(lineDisp, 4, 50 + i * 16);
     }
-    if (_totalLines > PREVIEW_LINES) {
-        char more[32];
-        snprintf(more, sizeof(more), "... +%d more lines", _totalLines - PREVIEW_LINES);
+    if (_hasMore) {
         tft.setTextColor(CLR_BORDER, CLR_BG);
-        tft.drawString(more, 4, 50 + _lineCount * 16);
+        tft.drawString("... more lines in file", 4, 50 + _lineCount * 16);
     }
 
     // Buttons

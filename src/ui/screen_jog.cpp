@@ -10,6 +10,8 @@ constexpr float JogScreen::FEEDS[];
 
 void JogScreen::enter() {
     _lastUpdate = 0;
+    _prevX = _prevY = _prevZ = -9999;
+    _prevState = -1;
 }
 
 void JogScreen::draw() {
@@ -126,25 +128,35 @@ void JogScreen::drawStepAndFeed() {
 }
 
 void JogScreen::drawPosition() {
-    TFT_eSPI& tft = ui.tft();
     const GrblStatus& st = grbl.status();
+    int si = (int)st.state;
+
+    // Skip redraw if nothing changed
+    if (fabsf(st.wposX - _prevX) < 0.005f &&
+        fabsf(st.wposY - _prevY) < 0.005f &&
+        fabsf(st.wposZ - _prevZ) < 0.005f &&
+        si == _prevState) return;
+
+    _prevX = st.wposX;
+    _prevY = st.wposY;
+    _prevZ = st.wposZ;
+    _prevState = si;
+
+    TFT_eSPI& tft = ui.tft();
 
     tft.setTextSize(1);
     tft.setTextColor(CLR_TEXT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
 
-    char buf[40];
+    char buf[48];
     int posY = 196;
 
-    // GRBL state
     const char* stateNames[] = {"???", "Idle", "Run", "Hold", "Jog", "ALARM", "Door", "Check", "Home", "Sleep"};
-    int si = (int)st.state;
     if (si < 0 || si > 9) si = 0;
 
-    snprintf(buf, sizeof(buf), "X:%7.2f Y:%7.2f Z:%7.2f [%s]",
+    snprintf(buf, sizeof(buf), "X:%7.2f Y:%7.2f Z:%7.2f [%s]  ",
              st.wposX, st.wposY, st.wposZ, stateNames[si]);
 
-    // Clear and redraw position line
     tft.fillRect(0, posY, SCREEN_W, 14, CLR_BG);
     tft.drawString(buf, 4, posY + 7);
 }

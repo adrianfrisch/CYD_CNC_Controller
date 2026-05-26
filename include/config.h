@@ -7,11 +7,15 @@
 #include <Arduino.h>
 
 // -----------------------------------------------------------------------------
-// DEVELOP MODE — set to 1 to disable GRBL serial and enable debug logging
-// In develop mode: no UART2 communication, simulated GRBL state,
-// extra serial output for every touch, screen switch, button press, etc.
+// DEVELOP MODE — set to 1 to enable debug logging
+// DEBUG_SERIAL_GRBL — set to 1 to route GRBL communication over USB Serial
+//   instead of UART2. This lets you test with grbl_simulator.py connected
+//   to the CYD's USB port. Debug log messages are prefixed with [DBG]/[UI]/etc.
+//   and the simulator ignores lines starting with '['.
+//   Set both to 0 for production with a real CNC machine.
 // -----------------------------------------------------------------------------
-#define DEVELOP_MODE      1
+#define DEVELOP_MODE          1
+#define DEBUG_SERIAL_GRBL     1
 
 // Debug logging macros (active only in DEVELOP_MODE)
 #if DEVELOP_MODE
