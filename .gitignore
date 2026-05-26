@@ -1,0 +1,29 @@
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*~
+
+# Build
+build/
+cmake-build-*/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Compiled
+*.o
+*.a
+*.so
+*.elf
+*.bin
+*.hex
+*.map
+
