@@ -8,6 +8,11 @@ Upload GCode files over WiFi, preview them on the touchscreen, and run jobs — 
 ![Framework](https://img.shields.io/badge/framework-Arduino-green)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
+> **⚠️ DISCLAIMER: This project is a work in progress and is NOT functional yet.**
+> It is under active development. Features may be incomplete, untested, or broken.
+> Do **not** use this to control a real CNC machine at this stage — you risk damage
+> to your equipment or injury. Use at your own risk.
+
 ---
 
 ## Features
