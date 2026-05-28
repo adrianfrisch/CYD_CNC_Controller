@@ -270,8 +270,15 @@ File Browser  ──OPEN──→  Preview  ──START──→  Job
 │       ├── screen_preview      GCode preview before execution
 │       ├── screen_job          Job progress and control
 │       └── screen_jog          Manual XYZ jogging interface
-├── Idea.md                     Original project concept
+├── lib/testable/               Platform-independent logic (unit-testable on PC)
+├── test/                       Unity test suites (114 tests across 5 suites)
+├── tools/                      GRBL simulator and integration test runner
+├── ARCHITECTURE.md             System architecture and data flow diagrams
+├── CONTRIBUTING.md             Development workflow and code conventions
 ├── SPECIFICATION.md            Detailed software specification
+├── TEST_STRATEGY.md            Testing approach and test case catalog
+├── CLAUDE.md                   AI assistant context file
+├── .github/copilot-instructions.md  GitHub Copilot custom instructions
 └── README.md                   This file
 ```
 

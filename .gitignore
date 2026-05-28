@@ -10,6 +10,10 @@
 *.swp
 *~
 
+# Coverage
+coverage_report/
+coverage.info
+
 # Build
 build/
 cmake-build-*/
