@@ -357,7 +357,7 @@ The CNC Shield v3.0 stacks directly on the Arduino Uno's pin headers. The serial
 | Element              | Position       | Description |
 |----------------------|----------------|-------------|
 | Header bar           | Top (0–24px)   | Title: "JOG Control" |
-| XY jog pad           | Left area      | Directional buttons: Y+, X-, X+, Y- in cross layout |
+| XY jog pad           | Left area      | 3×3 grid: cardinal directions (Y+, X-, X+, Y-) in cross layout, diagonal movement buttons (X-Y+, X+Y+, X-Y-, X+Y-) in corners |
 | Z jog buttons        | Center-right   | Z+ (up) and Z- (down) — uses current step size at Z feed rate |
 | Z microstep buttons  | Far right      | Z+.05 / Z-.05 — fixed 0.05mm step at 50 mm/min for Z touch-off |
 | Step size display     | Center row     | "Step: N.Nmm" with – / + buttons |
@@ -373,6 +373,7 @@ The CNC Shield v3.0 stacks directly on the Arduino Uno's pin headers. The serial
 **XY Feed rates:** 50, 100, 500, 1000, 2000, 3000, 5000 mm/min (default: 1000 mm/min)  
 **Z Feed rate:** Automatically calculated as XY feed ÷ 2 (configurable via `JOG_Z_FEED_DIVISOR`)  
 **Z Microstep:** Fixed 0.05 mm at 50 mm/min — intended for manually zeroing Z by touching off the workpiece  
+**Diagonal movement:** Moves the configured step distance on each axis simultaneously (e.g., step=1mm sends X1.000 Y1.000). This means the actual diagonal travel distance is step × √2, but each axis moves exactly the configured step amount. Feed rate is the same as XY feed.  
 **Jog command format:** `$J=G91 Xn.nnn Yn.nnn Zn.nnn Fnnn`
 
 ---

@@ -26,15 +26,22 @@ void JogScreen::draw() {
     int padX = JOG_PAD_X, padY = JOG_PAD_Y;
     int bw = JOG_BTN_W, bh = JOG_BTN_H, gap = JOG_GAP;
 
-    // Y+
+    // Diagonal buttons (corners)
+    Button btnXmYp = {padX,                  padY,                  bw, bh, CLR_BORDER, "\\^"};
+    Button btnXpYp = {padX + 2 * (bw + gap), padY,                  bw, bh, CLR_BORDER, "^/"};
+    Button btnXmYm = {padX,                  padY + 2 * (bh + gap), bw, bh, CLR_BORDER, "/v"};
+    Button btnXpYm = {padX + 2 * (bw + gap), padY + 2 * (bh + gap), bw, bh, CLR_BORDER, "v\\"};
+
+    // Cardinal buttons (cross)
     Button btnYP = {padX + bw + gap, padY, bw, bh, CLR_BTN, "Y+"};
-    // X-
     Button btnXM = {padX, padY + bh + gap, bw, bh, CLR_BTN, "X-"};
-    // X+
     Button btnXP = {padX + 2 * (bw + gap), padY + bh + gap, bw, bh, CLR_BTN, "X+"};
-    // Y-
     Button btnYM = {padX + bw + gap, padY + 2 * (bh + gap), bw, bh, CLR_BTN, "Y-"};
 
+    UIManager::drawButton(tft, btnXmYp);
+    UIManager::drawButton(tft, btnXpYp);
+    UIManager::drawButton(tft, btnXmYm);
+    UIManager::drawButton(tft, btnXpYm);
     UIManager::drawButton(tft, btnYP);
     UIManager::drawButton(tft, btnXM);
     UIManager::drawButton(tft, btnXP);
@@ -171,6 +178,16 @@ void JogScreen::onTouch(int16_t x, int16_t y) {
     int bw = JOG_BTN_W, bh = JOG_BTN_H, gap = JOG_GAP;
 
     // --- XY pad ---
+    // Diagonal: X-Y+ (top-left corner)
+    if (x >= padX && x < padX + bw && y >= padY && y < padY + bh) {
+        grbl.jog(-_jogStep, _jogStep, 0, _jogFeed);
+        return;
+    }
+    // Diagonal: X+Y+ (top-right corner)
+    if (x >= padX + 2 * (bw + gap) && x < padX + 3 * bw + 2 * gap && y >= padY && y < padY + bh) {
+        grbl.jog(_jogStep, _jogStep, 0, _jogFeed);
+        return;
+    }
     // Y+
     if (x >= padX + bw + gap && x < padX + 2 * bw + gap && y >= padY && y < padY + bh) {
         grbl.jog(0, _jogStep, 0, _jogFeed);
@@ -184,6 +201,16 @@ void JogScreen::onTouch(int16_t x, int16_t y) {
     // X+
     if (x >= padX + 2 * (bw + gap) && x < padX + 3 * bw + 2 * gap && y >= padY + bh + gap && y < padY + 2 * bh + gap) {
         grbl.jog(_jogStep, 0, 0, _jogFeed);
+        return;
+    }
+    // Diagonal: X-Y- (bottom-left corner)
+    if (x >= padX && x < padX + bw && y >= padY + 2 * (bh + gap) && y < padY + 3 * bh + 2 * gap) {
+        grbl.jog(-_jogStep, -_jogStep, 0, _jogFeed);
+        return;
+    }
+    // Diagonal: X+Y- (bottom-right corner)
+    if (x >= padX + 2 * (bw + gap) && x < padX + 3 * bw + 2 * gap && y >= padY + 2 * (bh + gap) && y < padY + 3 * bh + 2 * gap) {
+        grbl.jog(_jogStep, -_jogStep, 0, _jogFeed);
         return;
     }
     // Y-

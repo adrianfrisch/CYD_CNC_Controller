@@ -24,7 +24,7 @@ The configuration for your CYD needs to be adjusted in the platformio.ini file t
 - Home is untested. My CNC machine does not support homing
 
 ## Improvement ideas
-- Add buttons on the jog screen for diagonal movements
+- Include a clearance height in the machine config. When I press return to zero, the Z-axis should move the z-axis first to this safe height before moving x and y. Then after the move, the z should move to zero. 
 
 ---
 
@@ -234,7 +234,8 @@ File Browser  ──OPEN──→  Preview  ──START──→  Job
 
 ### Jog Control
 
-- **XY pad** — tap Y+, Y-, X-, X+ to jog in that direction
+- **XY pad** — tap Y+, Y-, X-, X+ to jog in that direction; corner buttons for diagonal XY movement
+- **Diagonal** — moves the step distance on each axis simultaneously (step=1mm → X+1 Y+1, not 1mm total diagonal)
 - **Z buttons** — Z+ (up) and Z- (down) at half the XY feed rate
 - **Z microstep** — Z+.01 / Z-.01 buttons (0.01mm at 50 mm/min) for precise Z touch-off zeroing
 - **Step size** — tap **–** / **+** to cycle through 0.1, 0.5, 1.0, 5.0, 10.0, 50.0 mm
