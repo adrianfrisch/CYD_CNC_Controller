@@ -35,7 +35,7 @@ void XPT2046_Soft::begin() {
 #endif
     _spi->begin(TOUCH_CLK_PIN, TOUCH_MISO_PIN, TOUCH_MOSI_PIN);
 
-    Serial.printf("[TOUCH] Pins: CS=%d CLK=%d MOSI=%d MISO=%d (hardware SPI, shared bus)\n",
+    DebugSerial.printf("[TOUCH] Pins: CS=%d CLK=%d MOSI=%d MISO=%d (hardware SPI, shared bus)\n",
                   TOUCH_CS_PIN, TOUCH_CLK_PIN, TOUCH_MOSI_PIN, TOUCH_MISO_PIN);
 
     // Self-test
@@ -50,8 +50,8 @@ void XPT2046_Soft::begin() {
     digitalWrite(TOUCH_CS_PIN, HIGH);
     _spi->endTransaction();
 
-    Serial.printf("[TOUCH] Self-test: Z1=%u Z2=%u X=%u Y=%u\n", z1, z2, tx, ty);
-    Serial.printf("[TOUCH] Z pressure = %d (threshold=%d)\n",
+    DebugSerial.printf("[TOUCH] Self-test: Z1=%u Z2=%u X=%u Y=%u\n", z1, z2, tx, ty);
+    DebugSerial.printf("[TOUCH] Z pressure = %d (threshold=%d)\n",
                   (int)z1 - (int)z2 + 4095, Z_THRESHOLD);
 }
 
@@ -127,7 +127,7 @@ void XPT2046_Soft::begin() {
     digitalWrite(TOUCH_CLK_PIN, LOW);
     digitalWrite(TOUCH_MOSI_PIN, LOW);
 
-    Serial.printf("[TOUCH] Pins: CS=%d CLK=%d MOSI=%d MISO=%d (software SPI)\n",
+    DebugSerial.printf("[TOUCH] Pins: CS=%d CLK=%d MOSI=%d MISO=%d (software SPI)\n",
                   TOUCH_CS_PIN, TOUCH_CLK_PIN, TOUCH_MOSI_PIN, TOUCH_MISO_PIN);
 
     // Self-test
@@ -139,8 +139,8 @@ void XPT2046_Soft::begin() {
     uint16_t ty = readChannel(CMD_Y);
     readChannel(CMD_PWD);
     digitalWrite(TOUCH_CS_PIN, HIGH);
-    Serial.printf("[TOUCH] Self-test: Z1=%u Z2=%u X=%u Y=%u\n", z1, z2, tx, ty);
-    Serial.printf("[TOUCH] Z pressure = %d (threshold=%d)\n",
+    DebugSerial.printf("[TOUCH] Self-test: Z1=%u Z2=%u X=%u Y=%u\n", z1, z2, tx, ty);
+    DebugSerial.printf("[TOUCH] Z pressure = %d (threshold=%d)\n",
                   (int)z1 - (int)z2 + 4095, Z_THRESHOLD);
 }
 

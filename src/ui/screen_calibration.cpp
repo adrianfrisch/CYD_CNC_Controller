@@ -41,7 +41,7 @@ void CalibrationScreen::draw() {
     int attempts = 0;
     while (!ui.getRawTouch(rx, ry)) {
         if (++attempts % 50 == 0) { // Print every ~2.5 seconds
-            Serial.printf("[CAL] Waiting for touch... (attempt %d)\n", attempts);
+            DebugSerial.printf("[CAL] Waiting for touch... (attempt %d)\n", attempts);
             // Show on screen that we're alive
             char msg[40];
             snprintf(msg, sizeof(msg), "Waiting... (%d)", attempts);
@@ -50,7 +50,7 @@ void CalibrationScreen::draw() {
         }
         delay(50);
     }
-    Serial.printf("[CAL] Touch detected! Raw: X=%d Y=%d\n", rx, ry);
+    DebugSerial.printf("[CAL] Touch detected! Raw: X=%d Y=%d\n", rx, ry);
 
     // Wait for release
     while (ui.getRawTouch(rx, ry)) { delay(10); }

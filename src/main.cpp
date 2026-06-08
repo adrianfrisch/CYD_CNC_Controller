@@ -22,53 +22,55 @@
 #include "ui/ui_manager.h"
 
 void setup() {
-    // Debug serial (USB)
-    Serial.begin(115200);
+    // Debug serial (USB) — skip if GRBL shares the same UART0 pins
+#ifndef GRBL_SHARED_SERIAL
+    DebugSerial.begin(115200);
     delay(500);
-    Serial.println();
-    Serial.println("========================================");
-    Serial.println("  CYD CNC Controller v1.0");
-    Serial.println("========================================");
+    DebugSerial.println();
+    DebugSerial.println("========================================");
+    DebugSerial.println("  CYD CNC Controller v1.0");
+    DebugSerial.println("========================================");
+#endif
 
     // Initialize display & UI (first, so user sees something immediately)
-    Serial.println("[INIT] Display & UI...");
+    DebugSerial.println("[INIT] Display & UI...");
     ui.begin();
 
     // Initialize SD card
-    Serial.println("[INIT] SD Card...");
+    DebugSerial.println("[INIT] SD Card...");
     if (sdCard.begin()) {
-        Serial.printf("[INIT] SD OK — %llu MB total, %llu MB used\n",
+        DebugSerial.printf("[INIT] SD OK — %llu MB total, %llu MB used\n",
                       sdCard.totalBytes() / (1024 * 1024),
                       sdCard.usedBytes() / (1024 * 1024));
     } else {
-        Serial.println("[INIT] SD Card FAILED — file features disabled");
+        DebugSerial.println("[INIT] SD Card FAILED — file features disabled");
     }
 
     // Now that SD is ready, check for touch calibration
     ui.checkCalibrationAfterSD();
 
     // Initialize GRBL serial
-    Serial.println("[INIT] GRBL UART2...");
+    DebugSerial.println("[INIT] GRBL UART2...");
     grbl.begin();
 
     // Initialize job streamer
-    Serial.println("[INIT] Job streamer...");
+    DebugSerial.println("[INIT] Job streamer...");
     job.begin();
 
     // Load machine configuration
-    Serial.println("[INIT] Machine config...");
+    DebugSerial.println("[INIT] Machine config...");
     machineConfig.begin();
 
 
     // Initialize WiFi & web server
-    Serial.println("[INIT] WiFi & Web Server...");
+    DebugSerial.println("[INIT] WiFi & Web Server...");
     webServer.begin();
     if (webServer.isConnected()) {
-        Serial.printf("[INIT] Upload files at: http://%s/\n", webServer.getIP().c_str());
+        DebugSerial.printf("[INIT] Upload files at: http://%s/\n", webServer.getIP().c_str());
     }
 
-    Serial.println("[INIT] Ready!");
-    Serial.println("========================================");
+    DebugSerial.println("[INIT] Ready!");
+    DebugSerial.println("========================================");
 }
 
 void loop() {

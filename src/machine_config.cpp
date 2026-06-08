@@ -10,17 +10,17 @@ MachineConfigManager machineConfig;
 
 void MachineConfigManager::begin() {
     if (loadConfig()) {
-        Serial.printf("[CFG] Machine config loaded: homing=%s, clearance=%.1fmm\n",
+        DebugSerial.printf("[CFG] Machine config loaded: homing=%s, clearance=%.1fmm\n",
                       _config.homingEnabled ? "yes" : "no",
                       _config.clearanceHeight);
     } else {
-        Serial.println("[CFG] No machine.cfg found — using defaults");
+        DebugSerial.println("[CFG] No machine.cfg found — using defaults");
     }
 }
 
 bool MachineConfigManager::loadConfig() {
     if (!SPIFFS.begin(true)) {
-        Serial.println("[CFG] SPIFFS mount failed");
+        DebugSerial.println("[CFG] SPIFFS mount failed");
         return false;
     }
 
@@ -30,7 +30,7 @@ bool MachineConfigManager::loadConfig() {
 
     File f = SPIFFS.open(MACHINE_CONFIG_FILE, "r");
     if (!f) {
-        Serial.println("[CFG] Failed to open machine.cfg");
+        DebugSerial.println("[CFG] Failed to open machine.cfg");
         return false;
     }
 

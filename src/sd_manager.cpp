@@ -7,21 +7,21 @@
 SDManager sdCard;
 
 bool SDManager::begin() {
-    Serial.printf("[SD] Init SPI: SCK=%d MISO=%d MOSI=%d CS=%d\n",
+    DebugSerial.printf("[SD] Init SPI: SCK=%d MISO=%d MOSI=%d CS=%d\n",
                   SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
     _spi.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
     if (!SD.begin(SD_CS_PIN, _spi, 1000000)) {
-        Serial.println("[SD] Mount failed");
+        DebugSerial.println("[SD] Mount failed");
         _ready = false;
         return false;
     }
     uint8_t cardType = SD.cardType();
     if (cardType == CARD_NONE) {
-        Serial.println("[SD] No card inserted");
+        DebugSerial.println("[SD] No card inserted");
         _ready = false;
         return false;
     }
-    Serial.printf("[SD] Card type: %d\n", cardType);
+    DebugSerial.printf("[SD] Card type: %d\n", cardType);
     _ready = true;
     return true;
 }
@@ -31,7 +31,7 @@ int SDManager::listGCodeFiles(const char* dir, FileInfo* out, int maxFiles) {
 
     File root = SD.open(dir);
     if (!root || !root.isDirectory()) {
-        Serial.printf("[SD] Cannot open dir: %s\n", dir);
+        DebugSerial.printf("[SD] Cannot open dir: %s\n", dir);
         return 0;
     }
 
@@ -71,7 +71,7 @@ int SDManager::listGCodeFiles(const char* dir, FileInfo* out, int maxFiles) {
         entry.close();
     }
     root.close();
-    Serial.printf("[SD] Found %d GCode files in %s\n", count, dir);
+    DebugSerial.printf("[SD] Found %d GCode files in %s\n", count, dir);
     return count;
 }
 

@@ -23,7 +23,7 @@ void GrblComm::begin() {
     // Pure develop mode — no serial, simulated state
     _connected = true;
     _status.state = GrblState::Idle;
-    Serial.println("[GRBL] DEVELOP MODE — UART disabled, simulating Idle state");
+    DebugSerial.println("[GRBL] DEVELOP MODE — UART disabled, simulating Idle state");
 #elif DEBUG_SERIAL_GRBL
     // Debug mode — GRBL comms over USB Serial (shared with debug output)
     // Serial is already initialized by Arduino framework
@@ -31,15 +31,15 @@ void GrblComm::begin() {
     _grblBufFree = GRBL_RX_BUFFER;
     _sentHead = _sentTail = _sentCount = 0;
     _connected = false;
-    Serial.println("[GRBL] DEBUG MODE — using USB Serial for GRBL communication");
-    Serial.println("[GRBL] Connect grbl_simulator.py to this port");
+    DebugSerial.println("[GRBL] DEBUG MODE — using USB Serial for GRBL communication");
+    DebugSerial.println("[GRBL] Connect grbl_simulator.py to this port");
 #else
     GRBL_PORT.begin(GRBL_BAUD_RATE, SERIAL_8N1, GRBL_RX_PIN, GRBL_TX_PIN);
     _rxPos = 0;
     _grblBufFree = GRBL_RX_BUFFER;
     _sentHead = _sentTail = _sentCount = 0;
     _connected = false;
-    Serial.println("[GRBL] UART2 initialized");
+    DebugSerial.println("[GRBL] UART2 initialized");
 #endif
 }
 
@@ -220,7 +220,7 @@ void GrblComm::parseLine(const char* line) {
             _sentTail = (_sentTail + 1) % GCODE_BUFFER_LINES;
             _sentCount--;
         }
-        Serial.printf("[GRBL] ERROR: %s\n", line);
+        DebugSerial.printf("[GRBL] ERROR: %s\n", line);
     } else if (strncmp(line, "ALARM:", 6) == 0) {
         _status.state = GrblState::Alarm;
         DBG("GRBL ALARM: %s", line);

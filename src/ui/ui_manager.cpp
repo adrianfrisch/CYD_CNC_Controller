@@ -33,7 +33,7 @@ void UIManager::begin() {
 
     // Initialize touch (software SPI — avoids HSPI conflict with SD card)
     _touch.begin();
-    Serial.println("[UI] XPT2046 touch initialized (software SPI)");
+    DebugSerial.println("[UI] XPT2046 touch initialized (software SPI)");
 
     // Create screens
     _screens[(int)ScreenId::FileBrowser] = new FileBrowserScreen();
@@ -45,10 +45,10 @@ void UIManager::begin() {
     // Load touch calibration from SD, or run calibration wizard
     // Load touch calibration from SD, or run calibration wizard
     if (!loadCalibration()) {
-        Serial.println("[UI] No calibration found — starting calibration wizard");
+        DebugSerial.println("[UI] No calibration found — starting calibration wizard");
         switchScreen(ScreenId::Calibration);
     } else {
-        Serial.println("[UI] Touch calibration loaded from SD");
+        DebugSerial.println("[UI] Touch calibration loaded from SD");
         switchScreen(ScreenId::FileBrowser);
     }
 }
@@ -84,7 +84,7 @@ void UIManager::switchScreen(ScreenId id) {
     _tft.fillScreen(CLR_BG);
     _current->enter();
     _current->draw();
-    Serial.printf("[UI] Switched to screen %d\n", idx);
+    DebugSerial.printf("[UI] Switched to screen %d\n", idx);
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ bool UIManager::hitTest(int16_t tx, int16_t ty, const Button& btn) {
 
 bool UIManager::loadCalibration() {
     if (!sdCard.isReady()) {
-        Serial.println("[UI] SD not ready — using default calibration");
+        DebugSerial.println("[UI] SD not ready — using default calibration");
         _calibrated = false;
         return true; // Use defaults temporarily, will re-check after SD init
     }
@@ -187,13 +187,13 @@ bool UIManager::loadCalibration() {
     f.close();
 
     if (bytesRead != sizeof(cal) || cal.magic != TOUCH_CAL_MAGIC) {
-        Serial.println("[UI] Calibration file corrupt — recalibrating");
+        DebugSerial.println("[UI] Calibration file corrupt — recalibrating");
         SD.remove(TOUCH_CAL_FILE);
         return false;
     }
 
     applyCalibration(cal);
-    Serial.printf("[UI] Calibration loaded: X[%d..%d] Y[%d..%d]\n",
+    DebugSerial.printf("[UI] Calibration loaded: X[%d..%d] Y[%d..%d]\n",
                   _cal.rawXMin, _cal.rawXMax, _cal.rawYMin, _cal.rawYMax);
     return true;
 }
@@ -205,28 +205,28 @@ void UIManager::checkCalibrationAfterSD() {
 
     // SD is now ready — try loading calibration
     if (!loadCalibration()) {
-        Serial.println("[UI] No calibration found — starting calibration wizard");
+        DebugSerial.println("[UI] No calibration found — starting calibration wizard");
         switchScreen(ScreenId::Calibration);
     } else {
-        Serial.println("[UI] Touch calibration loaded from SD");
+        DebugSerial.println("[UI] Touch calibration loaded from SD");
     }
 }
 
 void UIManager::saveCalibration(const TouchCalData& cal) {
     if (!sdCard.isReady()) {
-        Serial.println("[UI] SD not ready — calibration NOT saved");
+        DebugSerial.println("[UI] SD not ready — calibration NOT saved");
         return;
     }
 
     File f = SD.open(TOUCH_CAL_FILE, FILE_WRITE);
     if (!f) {
-        Serial.println("[UI] Failed to create calibration file");
+        DebugSerial.println("[UI] Failed to create calibration file");
         return;
     }
 
     f.write((uint8_t*)&cal, sizeof(cal));
     f.close();
-    Serial.printf("[UI] Calibration saved: X[%d..%d] Y[%d..%d]\n",
+    DebugSerial.printf("[UI] Calibration saved: X[%d..%d] Y[%d..%d]\n",
                   cal.rawXMin, cal.rawXMax, cal.rawYMin, cal.rawYMax);
 }
 

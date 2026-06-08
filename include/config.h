@@ -17,8 +17,8 @@
 #define DEVELOP_MODE          0
 #define DEBUG_SERIAL_GRBL     0
 
-// Debug logging macros (active only in DEVELOP_MODE)
-#if DEVELOP_MODE
+// Debug logging macros (active only in DEVELOP_MODE and when serial is not shared with GRBL)
+#if DEVELOP_MODE && !defined(GRBL_SHARED_SERIAL)
   #define DBG(fmt, ...)   Serial.printf("[DBG] " fmt "\n", ##__VA_ARGS__)
 #else
   #define DBG(fmt, ...)   ((void)0)
@@ -26,7 +26,29 @@
 
 // -----------------------------------------------------------------------------
 // GRBL Serial (UART2 → Arduino D0/D1)
+// When GRBL_SHARED_SERIAL is defined, GRBL uses UART0 (same as USB Serial).
+// All Serial.print debug logging is suppressed to avoid corrupting GRBL comms.
 // -----------------------------------------------------------------------------
+#ifdef GRBL_SHARED_SERIAL
+  #define GRBL_SERIAL       Serial
+  // Suppress all debug serial output — redefine Serial prints as no-ops
+  // GRBL comm module uses GRBL_SERIAL directly (which IS Serial)
+  class NullSerial {
+  public:
+      void begin(unsigned long) {}
+      void println(const char* = "") {}
+      void println(const __FlashStringHelper*) {}
+      void print(const char*) {}
+      void print(char) {}
+      void printf(const char*, ...) {}
+      void flush() {}
+  };
+  static NullSerial __nullSerial;
+  #define DebugSerial __nullSerial
+#else
+  #define GRBL_SERIAL       Serial2
+  #define DebugSerial       Serial
+#endif
 #ifndef GRBL_TX_PIN
   #define GRBL_TX_PIN       27   // CYD GPIO27 → Arduino D0 (RX)
 #endif
@@ -34,7 +56,6 @@
   #define GRBL_RX_PIN       22   // CYD GPIO22 ← Arduino D1 (TX)
 #endif
 #define GRBL_BAUD_RATE    115200
-#define GRBL_SERIAL       Serial2
 
 // -----------------------------------------------------------------------------
 // SD Card (HSPI)

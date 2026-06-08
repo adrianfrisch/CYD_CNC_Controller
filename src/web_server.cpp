@@ -108,15 +108,15 @@ void WebUploadServer::begin() {
     if (!loadWiFiConfig()) {
         _ssid = WIFI_SSID;
         _password = WIFI_PASSWORD;
-        Serial.println("[WEB] Using compiled WiFi credentials (no wifi.cfg found)");
+        DebugSerial.println("[WEB] Using compiled WiFi credentials (no wifi.cfg found)");
     }
 
     // Connect to WiFi network in station mode
     if (connectWiFi()) {
-        Serial.printf("[WEB] Connected to %s  IP: %s\n", _ssid.c_str(), WiFi.localIP().toString().c_str());
+        DebugSerial.printf("[WEB] Connected to %s  IP: %s\n", _ssid.c_str(), WiFi.localIP().toString().c_str());
     } else {
-        Serial.printf("[WEB] Failed to connect to %s — web upload unavailable\n", _ssid.c_str());
-        Serial.println("[WEB] Will retry in background...");
+        DebugSerial.printf("[WEB] Failed to connect to %s — web upload unavailable\n", _ssid.c_str());
+        DebugSerial.println("[WEB] Will retry in background...");
     }
 
     // Serve upload page
@@ -148,7 +148,7 @@ void WebUploadServer::begin() {
             static File uploadFile;
             if (index == 0) {
                 String path = "/" + filename;
-                Serial.printf("[WEB] Upload start: %s\n", path.c_str());
+                DebugSerial.printf("[WEB] Upload start: %s\n", path.c_str());
                 uploadFile = SD.open(path, FILE_WRITE);
             }
             if (uploadFile && len > 0) {
@@ -157,7 +157,7 @@ void WebUploadServer::begin() {
             if (final) {
                 if (uploadFile) {
                     uploadFile.close();
-                    Serial.printf("[WEB] Upload done: %s (%u bytes)\n", filename.c_str(), index + len);
+                    DebugSerial.printf("[WEB] Upload done: %s (%u bytes)\n", filename.c_str(), index + len);
                 }
             }
         }
@@ -180,31 +180,31 @@ void WebUploadServer::begin() {
 
     server.begin();
     _running = true;
-    Serial.println("[WEB] Server started on port 80");
+    DebugSerial.println("[WEB] Server started on port 80");
 }
 
 void WebUploadServer::loop() {
     // Reconnect WiFi if connection was lost
     if (!isConnected() && (millis() - _lastReconnectAttempt > 30000)) {
-        Serial.println("[WEB] WiFi disconnected, attempting reconnect...");
+        DebugSerial.println("[WEB] WiFi disconnected, attempting reconnect...");
         connectWiFi();
     }
 }
 
 bool WebUploadServer::loadWiFiConfig() {
     if (!SPIFFS.begin(true)) {
-        Serial.println("[WEB] SPIFFS mount failed");
+        DebugSerial.println("[WEB] SPIFFS mount failed");
         return false;
     }
 
     if (!SPIFFS.exists(WIFI_CONFIG_FILE)) {
-        Serial.println("[WEB] No wifi.cfg in flash (upload with: pio run -t uploadfs)");
+        DebugSerial.println("[WEB] No wifi.cfg in flash (upload with: pio run -t uploadfs)");
         return false;
     }
 
     File f = SPIFFS.open(WIFI_CONFIG_FILE, "r");
     if (!f) {
-        Serial.println("[WEB] Failed to open wifi.cfg");
+        DebugSerial.println("[WEB] Failed to open wifi.cfg");
         return false;
     }
 
@@ -228,13 +228,13 @@ bool WebUploadServer::loadWiFiConfig() {
     f.close();
 
     if (ssid.length() == 0) {
-        Serial.println("[WEB] wifi.cfg: SSID is empty");
+        DebugSerial.println("[WEB] wifi.cfg: SSID is empty");
         return false;
     }
 
     _ssid = ssid;
     _password = pass;
-    Serial.printf("[WEB] Loaded wifi.cfg: SSID='%s'\n", _ssid.c_str());
+    DebugSerial.printf("[WEB] Loaded wifi.cfg: SSID='%s'\n", _ssid.c_str());
     return true;
 }
 
@@ -244,13 +244,13 @@ bool WebUploadServer::connectWiFi() {
     WiFi.setHostname(WIFI_HOSTNAME);
     WiFi.begin(_ssid.c_str(), _password.c_str());
 
-    Serial.printf("[WEB] Connecting to WiFi '%s'...", _ssid.c_str());
+    DebugSerial.printf("[WEB] Connecting to WiFi '%s'...", _ssid.c_str());
     unsigned long start = millis();
     while (WiFi.status() != WL_CONNECTED && (millis() - start) < WIFI_CONNECT_TIMEOUT_MS) {
         delay(250);
-        Serial.print(".");
+        DebugSerial.print(".");
     }
-    Serial.println();
+    DebugSerial.println();
 
     return WiFi.status() == WL_CONNECTED;
 }

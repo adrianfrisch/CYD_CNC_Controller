@@ -2,18 +2,16 @@
 
 ## Project Summary
 
-ESP32-based touchscreen GCode sender for GRBL 1.1 CNC machines. Supports multiple boards:
-- **ESP32-2432S028R** "Cheap Yellow Display" (CYD) — 2.8" ILI9341 TFT (320×240) via TFT_eSPI
-- **ESP32-4827S043R** — 4.3" ST7262 RGB parallel (480×272) via LovyanGFX on ESP32-S3
+ESP32-based touchscreen GCode sender for GRBL 1.1 CNC machines. Supports multiple display sizes — primarily the ESP32-2432S028R "Cheap Yellow Display" (CYD) with a 2.8" ILI9341 TFT (320×240), but also 3.5" (480×320), 7" (800×480), and custom resolutions. All boards use XPT2046 resistive touch, SD card slot, and WiFi.
 
-All boards use XPT2046 resistive touch, SD card slot, and WiFi. The controller connects to an Arduino Uno running GRBL via 3-wire UART (TX/RX/GND). Users upload GCode files over WiFi, browse/preview them on the touchscreen, and stream jobs to the CNC — no PC required.
+The CYD connects to an Arduino Uno running GRBL via 3-wire UART (TX/RX/GND). Users upload GCode files over WiFi, browse/preview them on the touchscreen, and stream jobs to the CNC — no PC required.
 
 ## Tech Stack
 
-- **Platform:** ESP32 / ESP32-S3 (Arduino framework) via PlatformIO
+- **Platform:** ESP32 (Arduino framework) via PlatformIO
 - **Language:** C++17 (embedded subset — no STL containers, no exceptions, no RTTI)
-- **Display:** TFT_eSPI (SPI panels) or LovyanGFX (RGB parallel panels) via `DisplayDriver` abstraction
-- **Touch:** XPT2046 driver — software SPI (dedicated bus) or hardware SPI (shared with SD)
+- **Display:** TFT_eSPI library driving ILI9341 at 320×240 landscape
+- **Touch:** Custom software SPI XPT2046 driver (`xpt2046_soft.h/cpp`)
 - **Web:** ESPAsyncWebServer + AsyncTCP for file upload REST API
 - **JSON:** ArduinoJson v7
 - **Tests:** PlatformIO Unity framework, native environment (`pio test -e native`)
@@ -21,13 +19,11 @@ All boards use XPT2046 resistive touch, SD card slot, and WiFi. The controller c
 ## Build & Test Commands
 
 ```bash
-pio run -e esp32-2432S028R           # Build for CYD 2.8"
-pio run -e esp32-4827S043R           # Build for 4.3" RGB
-pio run -e native                    # Build native tests
-pio test -e native                   # Run all unit tests
+pio run                          # Build for ESP32
+pio run -e native                # Build native tests
+pio test -e native               # Run all unit tests
 pio test -e native -f test_grbl_parser  # Run one test suite
-pio run -e esp32-2432S028R -t upload # Flash to CYD via USB-C
-pio run -e esp32-4827S043R -t upload # Flash to 4.3" via USB
+pio run -t upload                # Flash to CYD via USB-C
 ```
 
 ## Code Conventions
@@ -98,7 +94,7 @@ Each screen has `draw()` (full redraw) and `handleTouch(x, y)` methods.
 ## File Structure Quick Reference
 
 ```
-include/config.h          — Pin defs, constants, colors (overridable via build flags)
+include/config.h          — All pin defs, constants, colors
 src/main.cpp              — setup() + loop() — calls begin()/loop() on each module
 src/grbl_comm.h/cpp       — UART to GRBL, status parsing, character-counting
 src/sd_manager.h/cpp      — SD card file I/O
@@ -106,9 +102,6 @@ src/job_streamer.h/cpp    — GCode file → GRBL streaming
 src/web_server.h/cpp      — WiFi STA + async web server for uploads
 src/ui/ui_manager.h/cpp   — Display init, touch, screen switching
 src/ui/ui_layout.h        — Resolution-independent layout constants
-src/ui/display_driver.h   — Abstraction: TFT_eSPI or LovyanGFX selection
-src/ui/lgfx_config_4827S043.h — LovyanGFX RGB panel config for ESP32-4827S043R
-src/ui/xpt2046_soft.h/cpp — Touch driver (software SPI or shared hardware SPI)
 src/ui/screen_*.h/cpp     — Individual screen implementations
 lib/testable/             — Hardware-free pure logic (for unit tests)
 test/test_*/              — Unity test suites

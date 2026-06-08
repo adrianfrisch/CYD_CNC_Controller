@@ -181,7 +181,7 @@ void FileBrowserScreen::onTouch(int16_t x, int16_t y) {
         if (idx < _fileCount) {
             _selectedIndex = (_selectedIndex == idx) ? -1 : idx; // toggle
             _confirmDelete = false;
-            Serial.printf("[FB] Selected file %d: %s\n", idx, _files[idx].name);
+            DebugSerial.printf("[FB] Selected file %d: %s\n", idx, _files[idx].name);
             _needsRedraw = true;
         }
         return;
@@ -201,7 +201,7 @@ void FileBrowserScreen::onTouch(int16_t x, int16_t y) {
             if (_page < totalPages - 1) { _page++; _selectedIndex = -1; _confirmDelete = false; _needsRedraw = true; }
         } else if (y >= FB_BTN_Y3 && y < FB_BTN_Y3 + BTN_H && _selectedIndex >= 0) {
             // OPEN — go to preview screen
-            Serial.printf("[FB] Opening: %s\n", _files[_selectedIndex].name);
+            DebugSerial.printf("[FB] Opening: %s\n", _files[_selectedIndex].name);
             snprintf(g_selectedFile, MAX_FILENAME, "/%s", _files[_selectedIndex].name);
             _confirmDelete = false;
             ui.switchScreen(ScreenId::Preview);
@@ -210,13 +210,13 @@ void FileBrowserScreen::onTouch(int16_t x, int16_t y) {
             if (_confirmDelete) {
                 char path[MAX_FILENAME + 2];
                 snprintf(path, sizeof(path), "/%s", _files[_selectedIndex].name);
-                Serial.printf("[FB] Deleting: %s\n", path);
+                DebugSerial.printf("[FB] Deleting: %s\n", path);
                 sdCard.remove(path);
                 _selectedIndex = -1;
                 _confirmDelete = false;
                 refreshFiles();
             } else {
-                Serial.printf("[FB] Delete requested — tap again to confirm\n");
+                DebugSerial.printf("[FB] Delete requested — tap again to confirm\n");
                 _confirmDelete = true;
                 _needsRedraw = true;
             }

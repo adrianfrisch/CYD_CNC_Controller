@@ -16,7 +16,7 @@ void JobStreamer::begin() {
             job._waitingForOk = false;
         } else if (strncmp(line, "error:", 6) == 0) {
             job._waitingForOk = false;
-            Serial.printf("[JOB] GRBL error on line %d: %s\n", job._currentLine, line);
+            DebugSerial.printf("[JOB] GRBL error on line %d: %s\n", job._currentLine, line);
         }
     });
 }
@@ -43,7 +43,7 @@ void JobStreamer::loop() {
         _state = JobState::Completed;
         _endTime = millis();
         _file.close();
-        Serial.println("[JOB] Completed");
+        DebugSerial.println("[JOB] Completed");
         if (_doneCb) _doneCb(true);
         return;
     }
@@ -51,13 +51,13 @@ void JobStreamer::loop() {
 
 bool JobStreamer::startJob(const char* filePath) {
     if (_state == JobState::Running) {
-        Serial.println("[JOB] Already running");
+        DebugSerial.println("[JOB] Already running");
         return false;
     }
 
     _file = sdCard.openFile(filePath);
     if (!_file) {
-        Serial.printf("[JOB] Failed to open: %s\n", filePath);
+        DebugSerial.printf("[JOB] Failed to open: %s\n", filePath);
         return false;
     }
 
@@ -77,7 +77,7 @@ bool JobStreamer::startJob(const char* filePath) {
     // Read first line
     readNextLine();
 
-    Serial.printf("[JOB] Started: %s (%d bytes)\n", filePath, _fileSize);
+    DebugSerial.printf("[JOB] Started: %s (%d bytes)\n", filePath, _fileSize);
     return true;
 }
 
@@ -85,7 +85,7 @@ void JobStreamer::pause() {
     if (_state == JobState::Running) {
         grbl.feedHold();
         _state = JobState::Paused;
-        Serial.println("[JOB] Paused");
+        DebugSerial.println("[JOB] Paused");
     }
 }
 
@@ -93,7 +93,7 @@ void JobStreamer::resume() {
     if (_state == JobState::Paused) {
         grbl.cycleResume();
         _state = JobState::Running;
-        Serial.println("[JOB] Resumed");
+        DebugSerial.println("[JOB] Resumed");
     }
 }
 
@@ -116,7 +116,7 @@ void JobStreamer::stop() {
         _currentLine = 0;
         _totalLines = 0;
 
-        Serial.println("[JOB] Stopped");
+        DebugSerial.println("[JOB] Stopped");
         if (_doneCb) _doneCb(false);
     }
 }
