@@ -44,7 +44,7 @@ void PreviewScreen::loadPreview() {
 }
 
 void PreviewScreen::draw() {
-    TFT_eSPI& tft = ui.tft();
+    DisplayDriver& tft = ui.tft();
     UIManager::drawHeader(tft, "GCode Preview");
 
     tft.setTextSize(UI_FONT_SM);

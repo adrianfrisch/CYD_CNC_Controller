@@ -38,7 +38,11 @@ public:
 
 private:
     bool _ready = false;
+#if CONFIG_IDF_TARGET_ESP32S3
+    SPIClass _spi = SPIClass(FSPI);
+#else
     SPIClass _spi = SPIClass(HSPI);
+#endif
 };
 
 extern SDManager sdCard;

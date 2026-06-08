@@ -20,7 +20,7 @@ void CalibrationScreen::enter() {
 }
 
 void CalibrationScreen::draw() {
-    TFT_eSPI& tft = ui.tft();
+    DisplayDriver& tft = ui.tft();
 
     // --- Instruction screen ---
     tft.fillScreen(CLR_BG);
@@ -144,7 +144,7 @@ void CalibrationScreen::onTouch(int16_t x, int16_t y) {
 // Draw a crosshair at the given screen position
 // ---------------------------------------------------------------------------
 void CalibrationScreen::drawCrosshair(int x, int y, uint16_t color) {
-    TFT_eSPI& tft = ui.tft();
+    DisplayDriver& tft = ui.tft();
     const int sz = 10;
     tft.drawLine(x - sz, y, x + sz, y, color);
     tft.drawLine(x, y - sz, x, y + sz, color);

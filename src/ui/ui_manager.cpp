@@ -16,12 +16,20 @@ UIManager ui;
 
 void UIManager::begin() {
     _tft.init();
-    _tft.setRotation(1); // Landscape, USB on left
+#ifdef USE_LOVYANGFX
+    _tft.setRotation(0); // RGB panel is already landscape (480x272)
+#else
+    _tft.setRotation(1); // SPI panels need rotation for landscape
+#endif
     _tft.fillScreen(CLR_BG);
 
-    // Backlight
+    // Backlight (LovyanGFX handles it via panel config; TFT_eSPI needs manual control)
+#ifndef USE_LOVYANGFX
     pinMode(TFT_BACKLIGHT_PIN, OUTPUT);
     digitalWrite(TFT_BACKLIGHT_PIN, HIGH);
+#else
+    _tft.setBrightness(255);
+#endif
 
     // Initialize touch (software SPI — avoids HSPI conflict with SD card)
     _touch.begin();
@@ -95,11 +103,18 @@ bool UIManager::getTouch(int16_t& screenX, int16_t& screenY) {
     int16_t rawX, rawY;
     if (!getRawTouch(rawX, rawY)) return false;
 
-    // Map raw touch values to screen coordinates
-    // XPT2046 axes are swapped relative to ILI9341 landscape rotation=1:
+    // Map raw touch values to screen coordinates.
+    // Axis mapping depends on display orientation vs touch panel orientation.
+#ifdef USE_LOVYANGFX
+    // RGB panel (rotation=0, native landscape): raw X → screen X, raw Y → screen Y
+    int32_t sx = (int32_t)(rawX - _cal.rawXMin) * SCREEN_W / (_cal.rawXMax - _cal.rawXMin);
+    int32_t sy = (int32_t)(rawY - _cal.rawYMin) * SCREEN_H / (_cal.rawYMax - _cal.rawYMin);
+#else
+    // ILI9341 (rotation=1, portrait panel rotated to landscape):
     //   raw X → screen Y,  raw Y → screen X
     int32_t sx = (int32_t)(rawY - _cal.rawYMin) * SCREEN_W / (_cal.rawYMax - _cal.rawYMin);
     int32_t sy = (int32_t)(rawX - _cal.rawXMin) * SCREEN_H / (_cal.rawXMax - _cal.rawXMin);
+#endif
 
     // Clamp to screen bounds
     if (sx < 0) sx = 0;
@@ -116,7 +131,7 @@ bool UIManager::getTouch(int16_t& screenX, int16_t& screenY) {
 // Drawing Helpers
 // ---------------------------------------------------------------------------
 
-void UIManager::drawButton(TFT_eSPI& tft, const Button& btn) {
+void UIManager::drawButton(DisplayDriver& tft, const Button& btn) {
     uint16_t col = btn.enabled ? btn.color : CLR_BORDER;
     tft.fillRoundRect(btn.x, btn.y, btn.w, btn.h, 4, col);
     tft.drawRoundRect(btn.x, btn.y, btn.w, btn.h, 4, CLR_TEXT);
@@ -127,7 +142,7 @@ void UIManager::drawButton(TFT_eSPI& tft, const Button& btn) {
     tft.drawString(btn.label, btn.x + btn.w / 2, btn.y + btn.h / 2);
 }
 
-void UIManager::drawHeader(TFT_eSPI& tft, const char* title) {
+void UIManager::drawHeader(DisplayDriver& tft, const char* title) {
     tft.fillRect(0, 0, SCREEN_W, UI_HEADER_H, CLR_HEADER);
     tft.setTextColor(CLR_TEXT, CLR_HEADER);
     tft.setTextDatum(ML_DATUM);
@@ -135,7 +150,7 @@ void UIManager::drawHeader(TFT_eSPI& tft, const char* title) {
     tft.drawString(title, UI_HEADER_TEXT_X, UI_HEADER_TEXT_Y);
 }
 
-void UIManager::drawProgressBar(TFT_eSPI& tft, int x, int y, int w, int h, int percent, uint16_t color) {
+void UIManager::drawProgressBar(DisplayDriver& tft, int x, int y, int w, int h, int percent, uint16_t color) {
     if (percent < 0) percent = 0;
     if (percent > 100) percent = 100;
     tft.drawRect(x, y, w, h, CLR_BORDER);
@@ -157,7 +172,7 @@ bool UIManager::loadCalibration() {
     if (!sdCard.isReady()) {
         Serial.println("[UI] SD not ready — using default calibration");
         _calibrated = false;
-        return true; // Use defaults, don't force calibration without SD
+        return true; // Use defaults temporarily, will re-check after SD init
     }
 
     if (!SD.exists(TOUCH_CAL_FILE)) {
@@ -181,6 +196,20 @@ bool UIManager::loadCalibration() {
     Serial.printf("[UI] Calibration loaded: X[%d..%d] Y[%d..%d]\n",
                   _cal.rawXMin, _cal.rawXMax, _cal.rawYMin, _cal.rawYMax);
     return true;
+}
+
+void UIManager::checkCalibrationAfterSD() {
+    if (!sdCard.isReady()) return;       // SD still not available
+    if (_calibrated) return;             // Already calibrated from file
+
+
+    // SD is now ready — try loading calibration
+    if (!loadCalibration()) {
+        Serial.println("[UI] No calibration found — starting calibration wizard");
+        switchScreen(ScreenId::Calibration);
+    } else {
+        Serial.println("[UI] Touch calibration loaded from SD");
+    }
 }
 
 void UIManager::saveCalibration(const TouchCalData& cal) {

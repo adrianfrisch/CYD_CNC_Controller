@@ -103,9 +103,9 @@ static constexpr int JOB_BTN_X3         = SCREEN_W * 246 / 320;    // 246 (FILES
 // Jog Screen layout
 // =============================================================================
 
-// XY jog pad
+// XY jog pad (starts at top — no header on jog screen)
 static constexpr int JOG_PAD_X          = SCREEN_W * 20 / 320;     // 20 @ 320
-static constexpr int JOG_PAD_Y          = SCREEN_H * 40 / 240;     // 40 @ 240
+static constexpr int JOG_PAD_Y          = SCREEN_H * 8 / 240;      // 8 @ 240 (was 40 — moved up, no header)
 static constexpr int JOG_BTN_W          = SCREEN_W * 55 / 320;     // 55 @ 320
 static constexpr int JOG_BTN_H          = SCREEN_H * 36 / 240;     // 36 @ 240
 static constexpr int JOG_GAP            = SCREEN_W * 4 / 320;      // 4 @ 320

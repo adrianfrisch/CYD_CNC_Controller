@@ -57,7 +57,7 @@ static constexpr int BTN_H = FB_BTN_H;
 static constexpr int LIST_W = FB_LIST_W;
 
 void FileBrowserScreen::draw() {
-    TFT_eSPI& tft = ui.tft();
+    DisplayDriver& tft = ui.tft();
     UIManager::drawHeader(tft, "CYD CNC - File Browser");
 
     // Status bar at bottom
@@ -108,7 +108,7 @@ void FileBrowserScreen::draw() {
 }
 
 void FileBrowserScreen::drawFileList() {
-    TFT_eSPI& tft = ui.tft();
+    DisplayDriver& tft = ui.tft();
 
     int startIdx = _page * FILES_PER_PAGE;
     int y = FB_LIST_TOP;

@@ -23,7 +23,7 @@ void JobScreen::enter() {
 }
 
 void JobScreen::draw() {
-    TFT_eSPI& tft = ui.tft();
+    DisplayDriver& tft = ui.tft();
     UIManager::drawHeader(tft, "Job Running");
 
     tft.setTextSize(UI_FONT_SM);
@@ -64,7 +64,7 @@ void JobScreen::drawProgressBar() {
     if (pct == _prevPct) return;
     _prevPct = pct;
 
-    TFT_eSPI& tft = ui.tft();
+    DisplayDriver& tft = ui.tft();
     UIManager::drawProgressBar(tft, UI_MARGIN, JOB_PROGRESS_Y, JOB_PROGRESS_W, JOB_PROGRESS_H, pct, CLR_PROGRESS);
 
     char buf[8];
@@ -85,7 +85,7 @@ void JobScreen::drawPosition() {
     _prevY = st.wposY;
     _prevZ = st.wposZ;
 
-    TFT_eSPI& tft = ui.tft();
+    DisplayDriver& tft = ui.tft();
     tft.setTextSize(UI_FONT_SM);
     tft.setTextColor(CLR_TEXT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
@@ -107,7 +107,7 @@ void JobScreen::drawState() {
     if (si < 0 || si > 9) si = 0;
     if (ji < 0 || ji > 4) ji = 0;
 
-    TFT_eSPI& tft = ui.tft();
+    DisplayDriver& tft = ui.tft();
     tft.setTextSize(UI_FONT_SM);
     tft.setTextColor(CLR_TEXT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
@@ -123,7 +123,7 @@ void JobScreen::drawFeedSpindle() {
     _prevFeed = st.feedRate;
     _prevSpindle = st.spindleSpeed;
 
-    TFT_eSPI& tft = ui.tft();
+    DisplayDriver& tft = ui.tft();
     tft.setTextSize(UI_FONT_SM);
     tft.setTextColor(CLR_TEXT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
@@ -138,7 +138,7 @@ void JobScreen::drawLine() {
     if (line == _prevLine) return;
     _prevLine = line;
 
-    TFT_eSPI& tft = ui.tft();
+    DisplayDriver& tft = ui.tft();
     tft.setTextSize(UI_FONT_SM);
     tft.setTextColor(CLR_TEXT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
@@ -155,7 +155,7 @@ void JobScreen::drawTime() {
     _prevElapsed = elapsed;
     _prevRemaining = remaining;
 
-    TFT_eSPI& tft = ui.tft();
+    DisplayDriver& tft = ui.tft();
     tft.setTextSize(UI_FONT_SM);
     tft.setTextColor(CLR_TEXT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
@@ -172,7 +172,7 @@ void JobScreen::drawGCodeLine() {
     if (strcmp(buf, _prevGCode) == 0) return;
     strncpy(_prevGCode, buf, sizeof(_prevGCode) - 1);
 
-    TFT_eSPI& tft = ui.tft();
+    DisplayDriver& tft = ui.tft();
     tft.fillRect(0, JOB_GCODE_Y, SCREEN_W, JOB_GCODE_H, CLR_HEADER);
     tft.setTextSize(UI_FONT_SM);
     tft.setTextColor(CLR_ACCENT, CLR_HEADER);

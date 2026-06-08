@@ -30,6 +30,10 @@ void setup() {
     Serial.println("  CYD CNC Controller v1.0");
     Serial.println("========================================");
 
+    // Initialize display & UI (first, so user sees something immediately)
+    Serial.println("[INIT] Display & UI...");
+    ui.begin();
+
     // Initialize SD card
     Serial.println("[INIT] SD Card...");
     if (sdCard.begin()) {
@@ -39,6 +43,9 @@ void setup() {
     } else {
         Serial.println("[INIT] SD Card FAILED — file features disabled");
     }
+
+    // Now that SD is ready, check for touch calibration
+    ui.checkCalibrationAfterSD();
 
     // Initialize GRBL serial
     Serial.println("[INIT] GRBL UART2...");
@@ -52,9 +59,6 @@ void setup() {
     Serial.println("[INIT] Machine config...");
     machineConfig.begin();
 
-    // Initialize display & UI
-    Serial.println("[INIT] Display & UI...");
-    ui.begin();
 
     // Initialize WiFi & web server
     Serial.println("[INIT] WiFi & Web Server...");

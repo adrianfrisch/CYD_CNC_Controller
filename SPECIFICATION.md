@@ -37,14 +37,12 @@ The controller supports multiple ESP32 TFT display boards. The UI layout adapts 
 | RAM                | 320 KB SRAM (no PSRAM)                   |
 | Flash              | 4 MB                                     |
 
-#### 2.1.2 Additional Supported Resolutions
+#### 2.1.2 Additional Supported Boards
 
-| Board / Display          | Resolution     | Build Flags                          |
-|--------------------------|----------------|--------------------------------------|
-| ESP32-2432S028R (CYD 2.8") | 320×240      | Default (no flags needed)            |
-| ESP32-3248S035 (CYD 3.5")  | 480×320      | `-DUI_SCREEN_W=480 -DUI_SCREEN_H=320` |
-| ESP32-8048S070 (7.0")      | 800×480      | `-DUI_SCREEN_W=800 -DUI_SCREEN_H=480` |
-| Custom                     | Any           | `-DUI_SCREEN_W=<w> -DUI_SCREEN_H=<h>` |
+| Board / Display              | Resolution     | MCU       | Display Interface | Touch       | Build Environment |
+|------------------------------|----------------|-----------|-------------------|-------------|-------------------|
+| ESP32-2432S028R (CYD 2.8")   | 320×240        | ESP32     | ILI9341 SPI       | XPT2046 (dedicated SW SPI) | `esp32-2432S028R` |
+| ESP32-4827S043R (4.3")       | 480×272        | ESP32-S3  | ST7262 RGB parallel (LovyanGFX) | XPT2046 (shared HW SPI with SD) | `esp32-4827S043R` |
 
 #### 2.1.3 Display Adaptation Strategy
 
@@ -52,7 +50,9 @@ The controller supports multiple ESP32 TFT display boards. The UI layout adapts 
 - Font sizes scale up for displays ≥480px wide (`UI_FONT_MD`, `UI_FONT_LG`)
 - No hardcoded pixel positions exist in screen implementations — all use layout constants
 - Touch calibration is per-device and stored on SD card (`/touch_cal.dat`)
-- TFT driver configuration (pin mappings, controller IC) is set via PlatformIO build flags for TFT_eSPI
+- Display driver is abstracted via `src/ui/display_driver.h` — selects TFT_eSPI or LovyanGFX based on `USE_LOVYANGFX` build flag
+- Touch axis mapping is board-specific (swapped on rotated SPI panels, direct on native-landscape RGB panels)
+- Touch driver auto-detects shared SPI bus and uses hardware SPI transactions when touch shares the SD card bus
 
 ### 2.2 CNC Controller
 
@@ -264,12 +264,13 @@ The CNC Shield v3.0 stacks directly on the Arduino Uno's pin headers. The serial
 
 | Responsibility            | Detail |
 |---------------------------|--------|
-| Display initialization    | ILI9341 via TFT_eSPI, landscape rotation, backlight on GPIO 21 |
-| Touch handling            | XPT2046 with 200 ms debounce |
-| Touch calibration         | 4-corner calibration via TFT_eSPI `calibrateTouch()`, saved as `/touch_cal.dat` on SD card |
+| Display initialization    | TFT_eSPI (SPI panels) or LovyanGFX (RGB panels) via `DisplayDriver` abstraction |
+| Touch handling            | XPT2046 with 200 ms debounce, hardware or software SPI depending on board |
+| Touch calibration         | 4-corner calibration wizard, saved as `/touch_cal.dat` on SD card |
+| Touch axis mapping        | Board-specific: swapped axes on rotated SPI panels, direct on RGB panels |
 | Screen management         | 5 screen instances (FileBrowser, Preview, Job, Jog, Calibration), `switchScreen()` triggers full redraw |
 | Drawing primitives        | `drawButton()`, `drawHeader()`, `drawProgressBar()`, `hitTest()` |
-| Touch calibration         | Pre-set calibration values for landscape rotation 1 |
+| Deferred calibration      | `checkCalibrationAfterSD()` triggers wizard after SD card is ready |
 
 **Display layout:** Resolution-independent — adapts to the configured `SCREEN_W` × `SCREEN_H` (default 320×240 pixels in landscape, USB port on left). All element positions are computed proportionally via `ui_layout.h`.
 
@@ -356,8 +357,7 @@ The CNC Shield v3.0 stacks directly on the Arduino Uno's pin headers. The serial
 
 | Element              | Position       | Description |
 |----------------------|----------------|-------------|
-| Header bar           | Top (0–24px)   | Title: "JOG Control" |
-| XY jog pad           | Left area      | 3×3 grid: cardinal directions (Y+, X-, X+, Y-) in cross layout, diagonal movement buttons (X-Y+, X+Y+, X-Y-, X+Y-) in corners |
+| XY jog pad           | Top-left area  | 3×3 grid: cardinal directions (Y+, X-, X+, Y-) in cross layout, diagonal movement buttons (X-Y+, X+Y+, X-Y-, X+Y-) in corners |
 | Z jog buttons        | Center-right   | Z+ (up) and Z- (down) — uses current step size at Z feed rate |
 | Z microstep buttons  | Far right      | Z+.05 / Z-.05 — fixed 0.05mm step at 50 mm/min for Z touch-off |
 | Step size display     | Center row     | "Step: N.Nmm" with – / + buttons |
@@ -479,12 +479,13 @@ All configuration is defined in `include/config.h`:
 
 ### 7.1 PlatformIO Libraries
 
-| Library              | Version      | Purpose |
-|----------------------|-------------|---------|
-| TFT_eSPI (Bodmer)    | ^2.5.43     | ILI9341 display driver + XPT2046 touch |
-| ESPAsyncWebServer    | latest (git) | Async HTTP server for file upload |
-| AsyncTCP             | latest (git) | TCP layer for async web server |
-| ArduinoJson          | ^7.0.0      | JSON serialization for REST API |
+| Library              | Version      | Purpose | Used By |
+|----------------------|-------------|---------|---------|
+| TFT_eSPI (Bodmer)    | ^2.5.43     | ILI9341 SPI display driver | esp32-2432S028R |
+| LovyanGFX (lovyan03) | ^1.1.16     | RGB parallel display driver (ESP32-S3) | esp32-4827S043R |
+| ESPAsyncWebServer    | latest (git) | Async HTTP server for file upload | All |
+| AsyncTCP             | latest (git) | TCP layer for async web server | All |
+| ArduinoJson          | ^7.0.0      | JSON serialization for REST API | All |
 
 ### 7.2 ESP32 Arduino Core Libraries (built-in)
 
@@ -508,13 +509,25 @@ All configuration is defined in `include/config.h`:
 
 ## 9. SPI Bus Allocation
 
+### ESP32-2432S028R (CYD 2.8")
+
 The ESP32-2432S028R uses three separate SPI peripherals:
 
 | SPI Bus | Peripheral   | Pins (MOSI/MISO/CLK/CS) | Frequency |
 |---------|-------------|--------------------------|-----------|
 | VSPI    | ILI9341 TFT | GPIO 13/–/14/15          | 55 MHz    |
-| –       | XPT2046 Touch | GPIO 32/39/25/33       | 2.5 MHz   |
+| –       | XPT2046 Touch | GPIO 32/39/25/33       | 2.5 MHz (software SPI) |
 | HSPI    | SD Card     | GPIO 23/19/18/5          | 4 MHz     |
+
+### ESP32-4827S043R (4.3")
+
+The ESP32-S3 board uses RGB parallel for display and shared SPI for SD + touch:
+
+| Bus       | Peripheral   | Pins                         | Frequency |
+|-----------|-------------|------------------------------|-----------|
+| LCD_CAM   | ST7262 RGB panel | 16 data + DE/HSYNC/VSYNC/PCLK | 9 MHz pixel clock |
+| FSPI      | SD Card     | GPIO 11/13/12/10 (MOSI/MISO/CLK/CS) | 1 MHz |
+| FSPI      | XPT2046 Touch | GPIO 11/13/12/38 (shared bus, CS=38) | 1 MHz |
 
 ---
 

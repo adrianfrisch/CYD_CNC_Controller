@@ -7,8 +7,10 @@
 SDManager sdCard;
 
 bool SDManager::begin() {
+    Serial.printf("[SD] Init SPI: SCK=%d MISO=%d MOSI=%d CS=%d\n",
+                  SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
     _spi.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
-    if (!SD.begin(SD_CS_PIN, _spi, 4000000)) {
+    if (!SD.begin(SD_CS_PIN, _spi, 1000000)) {
         Serial.println("[SD] Mount failed");
         _ready = false;
         return false;
@@ -19,7 +21,7 @@ bool SDManager::begin() {
         _ready = false;
         return false;
     }
-    Serial.printf("[SD] Card type: %d, Size: %llu MB\n", cardType, SD.cardSize() / (1024 * 1024));
+    Serial.printf("[SD] Card type: %d\n", cardType);
     _ready = true;
     return true;
 }

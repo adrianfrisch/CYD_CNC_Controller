@@ -4,7 +4,7 @@
 // =============================================================================
 
 #include <Arduino.h>
-#include <TFT_eSPI.h>
+#include "display_driver.h"
 #include "xpt2046_soft.h"
 #include "config.h"
 
@@ -52,6 +52,7 @@ public:
 
     // Touch calibration
     bool loadCalibration();
+    void checkCalibrationAfterSD();  // Call after SD is ready to trigger wizard if needed
     void saveCalibration(const TouchCalData& cal);
     void applyCalibration(const TouchCalData& cal);
     void runCalibration();
@@ -62,15 +63,15 @@ public:
     bool getTouch(int16_t& screenX, int16_t& screenY);
 
     // Drawing helpers
-    static void drawButton(TFT_eSPI& tft, const Button& btn);
-    static void drawHeader(TFT_eSPI& tft, const char* title);
-    static void drawProgressBar(TFT_eSPI& tft, int x, int y, int w, int h, int percent, uint16_t color);
+    static void drawButton(DisplayDriver& tft, const Button& btn);
+    static void drawHeader(DisplayDriver& tft, const char* title);
+    static void drawProgressBar(DisplayDriver& tft, int x, int y, int w, int h, int percent, uint16_t color);
     static bool hitTest(int16_t tx, int16_t ty, const Button& btn);
 
-    TFT_eSPI& tft() { return _tft; }
+    DisplayDriver& tft() { return _tft; }
 
 private:
-    TFT_eSPI  _tft;
+    DisplayDriver  _tft;
     XPT2046_Soft _touch;
 
     static constexpr int NUM_SCREENS = (int)ScreenId::_COUNT;

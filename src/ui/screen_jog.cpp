@@ -17,8 +17,8 @@ void JogScreen::enter() {
 }
 
 void JogScreen::draw() {
-    TFT_eSPI& tft = ui.tft();
-    UIManager::drawHeader(tft, "JOG Control");
+    DisplayDriver& tft = ui.tft();
+    // No header on jog screen — maximise space for controls
 
     tft.setTextSize(UI_FONT_SM);
 
@@ -93,7 +93,7 @@ void JogScreen::draw() {
 }
 
 void JogScreen::drawStepAndFeed() {
-    TFT_eSPI& tft = ui.tft();
+    DisplayDriver& tft = ui.tft();
     tft.setTextSize(UI_FONT_SM);
 
     // --- Step size row ---
@@ -147,7 +147,7 @@ void JogScreen::drawPosition() {
     _prevZ = st.wposZ;
     _prevState = si;
 
-    TFT_eSPI& tft = ui.tft();
+    DisplayDriver& tft = ui.tft();
 
     tft.setTextSize(UI_FONT_SM);
     tft.setTextColor(CLR_TEXT, CLR_BG);

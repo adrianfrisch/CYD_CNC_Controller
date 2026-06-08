@@ -27,32 +27,56 @@
 // -----------------------------------------------------------------------------
 // GRBL Serial (UART2 → Arduino D0/D1)
 // -----------------------------------------------------------------------------
-#define GRBL_TX_PIN       27   // CYD GPIO27 → Arduino D0 (RX)
-#define GRBL_RX_PIN       22   // CYD GPIO22 ← Arduino D1 (TX)
+#ifndef GRBL_TX_PIN
+  #define GRBL_TX_PIN       27   // CYD GPIO27 → Arduino D0 (RX)
+#endif
+#ifndef GRBL_RX_PIN
+  #define GRBL_RX_PIN       22   // CYD GPIO22 ← Arduino D1 (TX)
+#endif
 #define GRBL_BAUD_RATE    115200
 #define GRBL_SERIAL       Serial2
 
 // -----------------------------------------------------------------------------
 // SD Card (HSPI)
 // -----------------------------------------------------------------------------
-#define SD_CS_PIN         5
-#define SD_MOSI_PIN       23
-#define SD_MISO_PIN       19
-#define SD_SCK_PIN        18
+#ifndef SD_CS_PIN
+  #define SD_CS_PIN         5
+#endif
+#ifndef SD_MOSI_PIN
+  #define SD_MOSI_PIN       23
+#endif
+#ifndef SD_MISO_PIN
+  #define SD_MISO_PIN       19
+#endif
+#ifndef SD_SCK_PIN
+  #define SD_SCK_PIN        18
+#endif
 
 // -----------------------------------------------------------------------------
-// Display (ILI9341 on VSPI — handled by TFT_eSPI build flags)
+// Display (handled by TFT_eSPI or LovyanGFX build flags)
 // -----------------------------------------------------------------------------
-#define TFT_BACKLIGHT_PIN 21
+#ifndef TFT_BACKLIGHT_PIN
+  #define TFT_BACKLIGHT_PIN 21
+#endif
 
 // -----------------------------------------------------------------------------
 // Touch (XPT2046 on separate SPI bus from display)
 // -----------------------------------------------------------------------------
-#define TOUCH_CS_PIN      33
-#define TOUCH_IRQ_PIN     36
-#define TOUCH_MOSI_PIN    32
-#define TOUCH_MISO_PIN    39
-#define TOUCH_CLK_PIN     25
+#ifndef TOUCH_CS_PIN
+  #define TOUCH_CS_PIN      33
+#endif
+#ifndef TOUCH_IRQ_PIN
+  #define TOUCH_IRQ_PIN     36
+#endif
+#ifndef TOUCH_MOSI_PIN
+  #define TOUCH_MOSI_PIN    32
+#endif
+#ifndef TOUCH_MISO_PIN
+  #define TOUCH_MISO_PIN    39
+#endif
+#ifndef TOUCH_CLK_PIN
+  #define TOUCH_CLK_PIN     25
+#endif
 #define TOUCH_CAL_FILE    "/touch_cal.dat"   // Calibration data file on SD card
 
 // Calibration data: maps raw touch coordinates to screen pixels
