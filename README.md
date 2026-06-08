@@ -15,7 +15,7 @@ Upload GCode files over WiFi, preview them on the touchscreen, and run jobs — 
 
 ## Current status of the project
 I am currently testing the controller with my GRBL firmware based CNC machines. 
-I successfully ran a couple of .nc files successfully. But test and use at your own risk. 
+I successfully ran a couple of .nc files. But test and use at your own risk. 
 The configuration for your CYD needs to be adjusted in the platformio.ini file to match your model. 
 
 --- 
@@ -24,8 +24,7 @@ The configuration for your CYD needs to be adjusted in the platformio.ini file t
 - Home is untested. My CNC machine does not support homing
 
 ## Improvement ideas
-- Also add buttons on the jog screen for diagonal movements
-- Support other screen sizes & resolutions
+- Add buttons on the jog screen for diagonal movements
 
 ---
 
@@ -67,8 +66,8 @@ The configuration for your CYD needs to be adjusted in the platformio.ini file t
   │  │  2.8" TFT     │  │   │  ┌───┐ ┌───┐ ┌───┐  ↓                          │
   │  │  Touchscreen  │  │   │  │ X │ │ Y │ │ Z │ [PWR]                       │
   │  │  320×240      │  │   │  └─┬─┘ └─┬─┘ └─┬─┘                             │
-  │  └───────────────┘  │   │    │      │      │   To stepper motors         │
-  │                     │   ├────┴──────┴──────┴─────────────────────────────┤
+  │  └───────────────┘  │   │    │     │     │   To stepper motors           │
+  │                     │   ├────┴─────┴─────┴───────────────────────────────┤
   │  [USB-C]  [SD Card] │   │  Arduino Uno R3 (GRBL 1.1)                     │
   │   Power    GCode    │   │                                                │
   │   & Flash  Storage  │   │  [USB-B]                                       │

@@ -96,6 +96,24 @@ Soft SPI → XPT2046 Touch       (GPIO 32/39/25/33, ~2.5 MHz)
 HSPI ──→ SD Card               (GPIO 23/19/18/5,  4 MHz)
 ```
 
+## Display Resolution Abstraction
+
+```
+platformio.ini build flags
+    │  -DUI_SCREEN_W=xxx -DUI_SCREEN_H=yyy
+    ▼
+config.h ──→ SCREEN_W, SCREEN_H (defaults to 320×240)
+    │
+    ▼
+ui_layout.h ──→ All layout constants (proportional to resolution)
+    │
+    ▼
+screen_*.cpp ──→ Use layout constants only, no hardcoded pixel values
+```
+
+Supported resolutions: 320×240 (CYD 2.8"), 480×320 (CYD 3.5"), 800×480 (7"), or custom.
+Font sizes auto-scale: `UI_FONT_MD`/`UI_FONT_LG` increase at ≥480px width.
+
 ## Screen Navigation State Machine
 
 ```

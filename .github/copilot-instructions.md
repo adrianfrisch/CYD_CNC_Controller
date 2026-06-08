@@ -2,7 +2,7 @@
 
 ## Project Summary
 
-ESP32-based touchscreen GCode sender for GRBL 1.1 CNC machines. Runs on the ESP32-2432S028R "Cheap Yellow Display" (CYD) — a ~$10 board with a 2.8" ILI9341 TFT, XPT2046 resistive touch, SD card slot, and WiFi.
+ESP32-based touchscreen GCode sender for GRBL 1.1 CNC machines. Supports multiple display sizes — primarily the ESP32-2432S028R "Cheap Yellow Display" (CYD) with a 2.8" ILI9341 TFT (320×240), but also 3.5" (480×320), 7" (800×480), and custom resolutions. All boards use XPT2046 resistive touch, SD card slot, and WiFi.
 
 The CYD connects to an Arduino Uno running GRBL via 3-wire UART (TX/RX/GND). Users upload GCode files over WiFi, browse/preview them on the touchscreen, and stream jobs to the CNC — no PC required.
 
@@ -68,7 +68,7 @@ When adding new logic, always extract the pure computation into `testable_logic`
 | `GRBL_RX_BUFFER` | 128 | GRBL's RX buffer size |
 | `GCODE_LINE_MAX` | 256 | Max chars per GCode line |
 | `GCODE_BUFFER_LINES` | 16 | Max in-flight streaming commands |
-| `SCREEN_W` / `SCREEN_H` | 320 / 240 | Display resolution (landscape) |
+| `SCREEN_W` / `SCREEN_H` | 320 / 240 | Display resolution (landscape, configurable via build flags) |
 | `STATUS_POLL_MS` | 250 | GRBL status poll interval |
 | `TOUCH_DEBOUNCE_MS` | 200 | Touch debounce delay |
 
@@ -101,6 +101,7 @@ src/sd_manager.h/cpp      — SD card file I/O
 src/job_streamer.h/cpp    — GCode file → GRBL streaming
 src/web_server.h/cpp      — WiFi STA + async web server for uploads
 src/ui/ui_manager.h/cpp   — Display init, touch, screen switching
+src/ui/ui_layout.h        — Resolution-independent layout constants
 src/ui/screen_*.h/cpp     — Individual screen implementations
 lib/testable/             — Hardware-free pure logic (for unit tests)
 test/test_*/              — Unity test suites
@@ -118,7 +119,8 @@ tools/grbl_simulator.py   — Python GRBL simulator for testing
 ### Adding a new UI screen
 1. Create `src/ui/screen_<name>.h/cpp`
 2. Add `Screen<Name>` class with `draw()` and `handleTouch(int x, int y)`
-3. Register in `UIManager` — add enum value, instance, and case in `switchScreen()`
+3. Use layout constants from `ui_layout.h` — never hardcode pixel positions
+4. Register in `UIManager` — add enum value, instance, and case in `switchScreen()`
 
 ### Adding a new GRBL command
 1. Add method to `GrblComm` class in `grbl_comm.h`

@@ -1,15 +1,15 @@
 # CYD CNC Controller — Software Specification
 
-**Version:** 1.0  
-**Date:** 2026-05-20  
-**Platform:** ESP32-2432S028R (Cheap Yellow Display)  
+**Version:** 1.1  
+**Date:** 2026-06-08  
+**Platform:** ESP32 with TFT touchscreen (multiple display sizes supported)  
 **Target CNC Firmware:** GRBL 1.1 (Arduino Uno/Nano)
 
 ---
 
 ## 1. Overview
 
-The CYD CNC Controller is a standalone, touchscreen-based GCode sender for CNC machines running GRBL firmware. It replaces a PC-based sender (such as UGS — Universal GCode Sender) with a compact, dedicated hardware controller built on the ESP32-2432S028R development board (commonly known as the "Cheap Yellow Display" or CYD).
+The CYD CNC Controller is a standalone, touchscreen-based GCode sender for CNC machines running GRBL firmware. It replaces a PC-based sender (such as UGS — Universal GCode Sender) with a compact, dedicated hardware controller built on ESP32 development boards with TFT touchscreens. The primary target is the ESP32-2432S028R (commonly known as the "Cheap Yellow Display" or CYD), but the UI is resolution-independent and supports multiple display sizes (320×240, 480×320, 800×480, or custom).
 
 The device communicates with the CNC controller over a 3-wire UART connection and provides:
 
@@ -21,7 +21,11 @@ The device communicates with the CNC controller over a 3-wire UART connection an
 
 ## 2. Hardware Requirements
 
-### 2.1 CYD Board — ESP32-2432S028R
+### 2.1 Supported Displays
+
+The controller supports multiple ESP32 TFT display boards. The UI layout adapts automatically to different screen resolutions via proportional layout constants defined in `ui_layout.h`. Display resolution is configured via PlatformIO build flags (`-DUI_SCREEN_W=xxx -DUI_SCREEN_H=yyy`).
+
+#### 2.1.1 Primary Target — ESP32-2432S028R (CYD 2.8")
 
 | Component          | Specification                            |
 |--------------------|------------------------------------------|
@@ -32,6 +36,23 @@ The device communicates with the CNC controller over a 3-wire UART connection an
 | Programming Port   | USB-C (CH340 USB-to-serial)              |
 | RAM                | 320 KB SRAM (no PSRAM)                   |
 | Flash              | 4 MB                                     |
+
+#### 2.1.2 Additional Supported Resolutions
+
+| Board / Display          | Resolution     | Build Flags                          |
+|--------------------------|----------------|--------------------------------------|
+| ESP32-2432S028R (CYD 2.8") | 320×240      | Default (no flags needed)            |
+| ESP32-3248S035 (CYD 3.5")  | 480×320      | `-DUI_SCREEN_W=480 -DUI_SCREEN_H=320` |
+| ESP32-8048S070 (7.0")      | 800×480      | `-DUI_SCREEN_W=800 -DUI_SCREEN_H=480` |
+| Custom                     | Any           | `-DUI_SCREEN_W=<w> -DUI_SCREEN_H=<h>` |
+
+#### 2.1.3 Display Adaptation Strategy
+
+- All UI element positions and sizes are derived proportionally from `SCREEN_W` and `SCREEN_H` in `src/ui/ui_layout.h`
+- Font sizes scale up for displays ≥480px wide (`UI_FONT_MD`, `UI_FONT_LG`)
+- No hardcoded pixel positions exist in screen implementations — all use layout constants
+- Touch calibration is per-device and stored on SD card (`/touch_cal.dat`)
+- TFT driver configuration (pin mappings, controller IC) is set via PlatformIO build flags for TFT_eSPI
 
 ### 2.2 CNC Controller
 
@@ -250,7 +271,7 @@ The CNC Shield v3.0 stacks directly on the Arduino Uno's pin headers. The serial
 | Drawing primitives        | `drawButton()`, `drawHeader()`, `drawProgressBar()`, `hitTest()` |
 | Touch calibration         | Pre-set calibration values for landscape rotation 1 |
 
-**Display layout:** 320×240 pixels in landscape orientation (USB port on left).
+**Display layout:** Resolution-independent — adapts to the configured `SCREEN_W` × `SCREEN_H` (default 320×240 pixels in landscape, USB port on left). All element positions are computed proportionally via `ui_layout.h`.
 
 ---
 
@@ -426,8 +447,8 @@ All configuration is defined in `include/config.h`:
 | `SD_CS_PIN`           | 5             | SD card chip select |
 | `TFT_BACKLIGHT_PIN`   | 21            | Display backlight GPIO |
 | `TOUCH_CAL_FILE`      | `"/touch_cal.dat"` | Calibration data file path on SD card |
-| `SCREEN_W`            | 320           | Display width (landscape) |
-| `SCREEN_H`            | 240           | Display height (landscape) |
+| `SCREEN_W`            | 320           | Display width (landscape) — override with `-DUI_SCREEN_W=xxx` |
+| `SCREEN_H`            | 240           | Display height (landscape) — override with `-DUI_SCREEN_H=yyy` |
 
 ### 6.1 UI Color Scheme (RGB565)
 
@@ -501,4 +522,6 @@ The ESP32-2432S028R uses three separate SPI peripherals:
 8. **No OTA updates:** Firmware must be flashed via USB-C cable.
 9. **3-axis only:** No 4th axis (A-axis) support.
 10. **No file transfer over serial:** Files can only be uploaded via WiFi web interface.
+11. **Display driver fixed at compile time:** Changing display hardware requires updating TFT_eSPI build flags in `platformio.ini` and rebuilding. Resolution is configured via `-DUI_SCREEN_W` / `-DUI_SCREEN_H` build flags.
+12. **Landscape only:** All display sizes are assumed landscape orientation.
 

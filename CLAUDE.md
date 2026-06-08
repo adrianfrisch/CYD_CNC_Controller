@@ -4,7 +4,7 @@
 
 ## What is this project?
 
-A standalone **touchscreen GCode sender** for GRBL-based CNC machines. Runs on the ESP32-2432S028R "Cheap Yellow Display" — a $10 ESP32 board with 2.8" TFT touchscreen and SD card. Connects to an Arduino Uno running GRBL 1.1 via 3-wire UART. Users upload GCode files over WiFi, browse/preview on the touchscreen, and run CNC jobs without a PC.
+A standalone **touchscreen GCode sender** for GRBL-based CNC machines. Runs on ESP32 boards with TFT touchscreens — primarily the ESP32-2432S028R "Cheap Yellow Display" (2.8", 320×240), but supports multiple display sizes (3.5" 480×320, 7" 800×480, custom) via resolution-independent layout. Connects to an Arduino Uno running GRBL 1.1 via 3-wire UART. Users upload GCode files over WiFi, browse/preview on the touchscreen, and run CNC jobs without a PC.
 
 **Status:** Work in progress — functional for basic use but has known bugs (see README.md "Known Issues").
 
@@ -30,6 +30,7 @@ src/sd_manager.h/cpp         — SD card file operations (list, open, delete)
 src/job_streamer.h/cpp       — GCode file → GRBL streaming with flow control & progress tracking
 src/web_server.h/cpp         — WiFi STA mode + async REST API for file upload/delete
 src/ui/ui_manager.h/cpp      — TFT display, touch input, screen management
+src/ui/ui_layout.h           — Resolution-independent layout constants (derived from SCREEN_W/H)
 src/ui/screen_*.h/cpp        — 5 screens: calibration, filebrowser, preview, job, jog
 src/ui/xpt2046_soft.h/cpp    — Custom software SPI touch driver
 lib/testable/                — Pure logic extracted for native testing (no hardware deps)
@@ -72,10 +73,21 @@ Follow these strictly when generating code:
 - **CPU:** ESP32 dual-core 240 MHz
 - **RAM:** 320 KB SRAM (no PSRAM) — ~14% used currently
 - **Flash:** 4 MB — ~29% used currently  
-- **Display:** 320×240 px, RGB565 color, landscape orientation
-- **Touch:** Resistive XPT2046 with software SPI
+- **Display:** Configurable resolution (default 320×240, supports 480×320, 800×480, custom), RGB565 color, landscape orientation
+- **Touch:** Resistive XPT2046 with software SPI (calibration per-device on SD)
 - **SD:** FAT32, max 32 GB, max 64 files in listing
 - **UART to GRBL:** 115200 baud via GPIO 27 (TX) / GPIO 22 (RX)
+
+### Display Resolution Configuration
+
+Resolution is set via PlatformIO build flags — no code changes needed:
+
+```ini
+; platformio.ini example for 3.5" display
+build_flags = -DUI_SCREEN_W=480 -DUI_SCREEN_H=320
+```
+
+All UI layout is proportional via `src/ui/ui_layout.h`. Never hardcode pixel positions in screen code.
 
 ## Key Interfaces
 
