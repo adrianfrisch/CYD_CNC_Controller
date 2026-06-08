@@ -8,16 +8,14 @@ Upload GCode files over WiFi, preview them on the touchscreen, and run jobs — 
 ![Framework](https://img.shields.io/badge/framework-Arduino-green)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
-> **⚠️ DISCLAIMER: This project is a work in progress and is NOT functional yet.**
+> **⚠️ DISCLAIMER: This project is a work in progress and is NOT for production use.**
 > It is under active development. Features may be incomplete, untested, or broken.
-> Do **not** use this to control a real CNC machine at this stage — you risk damage
-> to your equipment or injury. Use at your own risk.
+> Use this at your own risk.
 
 ## Current status of the project
 I am currently testing the controller with my GRBL firmware based CNC machines. 
-I successfully ran a couple of .nc files. But test and use at your own risk. 
-The configuration for your CYD needs to be adjusted in the platformio.ini file to match your model. 
-
+I successfully ran a couple of .nc files. But still requires further testing. So use at your own risk. 
+The configuration for your CYD needs to be adjusted in the platformio.ini file to match your model.
 --- 
 
 ## Know Issues
@@ -183,6 +181,33 @@ The CYD connects to your existing WiFi network for wireless file management — 
 7. Tap **RFSH** on the CYD to see the new file
 
 > **Note:** If the WiFi connection is lost, the CYD will automatically reconnect every 30 seconds. The web server remains registered and will resume serving as soon as the connection is restored.
+
+---
+
+## Machine Configuration
+
+The file `data/machine.cfg` configures machine-specific features. Upload it to the CYD's SPIFFS filesystem with:
+
+```bash
+pio run -t uploadfs
+```
+
+### Available Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `HOMING` | `yes` | Set to `no` if your machine has no limit switches (disables the HOME button) |
+| `CLEARANCE_HEIGHT` | `0` | Safe Z height (mm) for "GO 0" moves. When > 0, return-to-zero first raises Z to this height, then moves XY, then lowers Z to zero. Set to 0 to move all axes simultaneously. |
+
+### Example `machine.cfg`
+
+```ini
+# Machine Configuration
+HOMING=no
+CLEARANCE_HEIGHT=10.0
+```
+
+> **Tip:** After editing `data/machine.cfg`, run `pio run -t uploadfs` to flash the updated config to the CYD. The settings take effect on the next reboot.
 
 ---
 
