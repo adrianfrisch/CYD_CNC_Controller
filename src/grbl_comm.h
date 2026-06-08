@@ -6,35 +6,7 @@
 
 #include <Arduino.h>
 #include "config.h"
-
-// GRBL machine states
-enum class GrblState : uint8_t {
-    Unknown,
-    Idle,
-    Run,
-    Hold,
-    Jog,
-    Alarm,
-    Door,
-    Check,
-    Home,
-    Sleep
-};
-
-// Parsed GRBL status
-struct GrblStatus {
-    GrblState state = GrblState::Unknown;
-    float wposX = 0, wposY = 0, wposZ = 0;   // Work position
-    float mposX = 0, mposY = 0, mposZ = 0;   // Machine position
-    int feedRate = 0;
-    int spindleSpeed = 0;
-    int bufferAvail = GRBL_RX_BUFFER;         // Planner buffer available
-    int rxAvail = GRBL_RX_BUFFER;             // RX buffer available
-    bool overrides = false;
-    int feedOverride = 100;
-    int rapidOverride = 100;
-    int spindleOverride = 100;
-};
+#include "../lib/testable/testable_logic.h"
 
 // Callback types
 using GrblResponseCb = void (*)(const char* line);
