@@ -3,6 +3,7 @@
 // =============================================================================
 
 #include "ui_manager.h"
+#include "ui_layout.h"
 #include "screen_filebrowser.h"
 #include "screen_preview.h"
 #include "screen_job.h"
@@ -122,16 +123,16 @@ void UIManager::drawButton(TFT_eSPI& tft, const Button& btn) {
 
     tft.setTextColor(CLR_TEXT, col);
     tft.setTextDatum(MC_DATUM);
-    tft.setTextSize(1);
+    tft.setTextSize(UI_FONT_SM);
     tft.drawString(btn.label, btn.x + btn.w / 2, btn.y + btn.h / 2);
 }
 
 void UIManager::drawHeader(TFT_eSPI& tft, const char* title) {
-    tft.fillRect(0, 0, SCREEN_W, 24, CLR_HEADER);
+    tft.fillRect(0, 0, SCREEN_W, UI_HEADER_H, CLR_HEADER);
     tft.setTextColor(CLR_TEXT, CLR_HEADER);
     tft.setTextDatum(ML_DATUM);
-    tft.setTextSize(1);
-    tft.drawString(title, 4, 12);
+    tft.setTextSize(UI_FONT_SM);
+    tft.drawString(title, UI_HEADER_TEXT_X, UI_HEADER_TEXT_Y);
 }
 
 void UIManager::drawProgressBar(TFT_eSPI& tft, int x, int y, int w, int h, int percent, uint16_t color) {

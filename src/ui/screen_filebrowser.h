@@ -4,9 +4,10 @@
 // =============================================================================
 
 #include "ui_manager.h"
+#include "ui_layout.h"
 #include "../sd_manager.h"
 
-#define FILES_PER_PAGE 6
+#define FILES_PER_PAGE FB_FILES_PER_PAGE
 
 class FileBrowserScreen : public Screen {
 public:

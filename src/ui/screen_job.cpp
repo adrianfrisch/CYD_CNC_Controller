@@ -4,6 +4,7 @@
 // =============================================================================
 
 #include "screen_job.h"
+#include "ui_layout.h"
 #include "../grbl_comm.h"
 #include "../job_streamer.h"
 
@@ -25,21 +26,21 @@ void JobScreen::draw() {
     TFT_eSPI& tft = ui.tft();
     UIManager::drawHeader(tft, "Job Running");
 
-    tft.setTextSize(1);
+    tft.setTextSize(UI_FONT_SM);
 
     // File name (static — only drawn once)
     tft.setTextColor(CLR_ACCENT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
-    tft.drawString(g_selectedFile, 4, 34);
+    tft.drawString(g_selectedFile, UI_MARGIN, JOB_FILE_Y);
 
     // Progress bar outline
-    tft.drawRect(4, 48, 312, 16, CLR_BORDER);
+    tft.drawRect(UI_MARGIN, JOB_PROGRESS_Y, JOB_PROGRESS_W, JOB_PROGRESS_H, CLR_BORDER);
 
     // Control buttons at bottom (static)
-    Button btnPause  = {4,   210, 70, 26, CLR_BTN_WARN,   "PAUSE"};
-    Button btnResume = {80,  210, 70, 26, CLR_BTN_ACTIVE,  "RESUME"};
-    Button btnStop   = {156, 210, 70, 26, CLR_BTN_DANGER,  "STOP"};
-    Button btnBack   = {246, 210, 70, 26, CLR_BTN,         "FILES"};
+    Button btnPause  = {JOB_BTN_X0, UI_BTN_ROW_Y, JOB_BTN_W, UI_BTN_ROW_H, CLR_BTN_WARN,   "PAUSE"};
+    Button btnResume = {JOB_BTN_X1, UI_BTN_ROW_Y, JOB_BTN_W, UI_BTN_ROW_H, CLR_BTN_ACTIVE,  "RESUME"};
+    Button btnStop   = {JOB_BTN_X2, UI_BTN_ROW_Y, JOB_BTN_W, UI_BTN_ROW_H, CLR_BTN_DANGER,  "STOP"};
+    Button btnBack   = {JOB_BTN_X3, UI_BTN_ROW_Y, JOB_BTN_W, UI_BTN_ROW_H, CLR_BTN,         "FILES"};
 
     UIManager::drawButton(tft, btnPause);
     UIManager::drawButton(tft, btnResume);
@@ -64,19 +65,18 @@ void JobScreen::drawProgressBar() {
     _prevPct = pct;
 
     TFT_eSPI& tft = ui.tft();
-    UIManager::drawProgressBar(tft, 4, 48, 312, 16, pct, CLR_PROGRESS);
+    UIManager::drawProgressBar(tft, UI_MARGIN, JOB_PROGRESS_Y, JOB_PROGRESS_W, JOB_PROGRESS_H, pct, CLR_PROGRESS);
 
     char buf[8];
     snprintf(buf, sizeof(buf), "%d%%", pct);
-    tft.setTextSize(1);
+    tft.setTextSize(UI_FONT_SM);
     tft.setTextColor(CLR_TEXT, pct > 50 ? CLR_PROGRESS : CLR_BG);
     tft.setTextDatum(MC_DATUM);
-    tft.drawString(buf, 160, 56);
+    tft.drawString(buf, JOB_PROGRESS_CX, JOB_PROGRESS_CY);
 }
 
 void JobScreen::drawPosition() {
     const GrblStatus& st = grbl.status();
-    // Compare with 0.005 tolerance to avoid float noise
     if (fabsf(st.wposX - _prevX) < 0.005f &&
         fabsf(st.wposY - _prevY) < 0.005f &&
         fabsf(st.wposZ - _prevZ) < 0.005f) return;
@@ -86,13 +86,13 @@ void JobScreen::drawPosition() {
     _prevZ = st.wposZ;
 
     TFT_eSPI& tft = ui.tft();
-    tft.setTextSize(1);
+    tft.setTextSize(UI_FONT_SM);
     tft.setTextColor(CLR_TEXT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
 
     char buf[48];
     snprintf(buf, sizeof(buf), "X:%7.2f  Y:%7.2f  Z:%7.2f  ", st.wposX, st.wposY, st.wposZ);
-    tft.drawString(buf, 4, 76);
+    tft.drawString(buf, UI_MARGIN, JOB_ROW_POS);
 }
 
 void JobScreen::drawState() {
@@ -108,13 +108,13 @@ void JobScreen::drawState() {
     if (ji < 0 || ji > 4) ji = 0;
 
     TFT_eSPI& tft = ui.tft();
-    tft.setTextSize(1);
+    tft.setTextSize(UI_FONT_SM);
     tft.setTextColor(CLR_TEXT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
 
     char buf[48];
     snprintf(buf, sizeof(buf), "GRBL: %-6s  Job: %-8s  ", stateNames[si], jobStates[ji]);
-    tft.drawString(buf, 4, 96);
+    tft.drawString(buf, UI_MARGIN, JOB_ROW_STATE);
 }
 
 void JobScreen::drawFeedSpindle() {
@@ -124,13 +124,13 @@ void JobScreen::drawFeedSpindle() {
     _prevSpindle = st.spindleSpeed;
 
     TFT_eSPI& tft = ui.tft();
-    tft.setTextSize(1);
+    tft.setTextSize(UI_FONT_SM);
     tft.setTextColor(CLR_TEXT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
 
     char buf[48];
     snprintf(buf, sizeof(buf), "Feed: %d mm/min  Spindle: %d RPM   ", st.feedRate, st.spindleSpeed);
-    tft.drawString(buf, 4, 116);
+    tft.drawString(buf, UI_MARGIN, JOB_ROW_FEED);
 }
 
 void JobScreen::drawLine() {
@@ -139,13 +139,13 @@ void JobScreen::drawLine() {
     _prevLine = line;
 
     TFT_eSPI& tft = ui.tft();
-    tft.setTextSize(1);
+    tft.setTextSize(UI_FONT_SM);
     tft.setTextColor(CLR_TEXT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
 
     char buf[32];
     snprintf(buf, sizeof(buf), "Line: %d     ", line);
-    tft.drawString(buf, 4, 136);
+    tft.drawString(buf, UI_MARGIN, JOB_ROW_LINE);
 }
 
 void JobScreen::drawTime() {
@@ -156,14 +156,14 @@ void JobScreen::drawTime() {
     _prevRemaining = remaining;
 
     TFT_eSPI& tft = ui.tft();
-    tft.setTextSize(1);
+    tft.setTextSize(UI_FONT_SM);
     tft.setTextColor(CLR_TEXT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
 
     char buf[48];
     snprintf(buf, sizeof(buf), "Elapsed: %02lu:%02lu  ETA: %02lu:%02lu   ",
              elapsed / 60, elapsed % 60, remaining / 60, remaining % 60);
-    tft.drawString(buf, 4, 156);
+    tft.drawString(buf, UI_MARGIN, JOB_ROW_TIME);
 }
 
 void JobScreen::drawGCodeLine() {
@@ -173,11 +173,11 @@ void JobScreen::drawGCodeLine() {
     strncpy(_prevGCode, buf, sizeof(_prevGCode) - 1);
 
     TFT_eSPI& tft = ui.tft();
-    tft.fillRect(0, 176, SCREEN_W, 20, CLR_HEADER);
-    tft.setTextSize(1);
+    tft.fillRect(0, JOB_GCODE_Y, SCREEN_W, JOB_GCODE_H, CLR_HEADER);
+    tft.setTextSize(UI_FONT_SM);
     tft.setTextColor(CLR_ACCENT, CLR_HEADER);
     tft.setTextDatum(ML_DATUM);
-    tft.drawString(buf, 4, 186);
+    tft.drawString(buf, UI_MARGIN, JOB_GCODE_TEXT_Y);
 }
 
 void JobScreen::update() {
@@ -199,13 +199,13 @@ void JobScreen::update() {
 }
 
 void JobScreen::onTouch(int16_t x, int16_t y) {
-    if (y < 210) return; // Only buttons at bottom
+    if (y < UI_BTN_ROW_Y) return; // Only buttons at bottom
 
-    if (x < 74) {
+    if (x < JOB_BTN_X1 - UI_TOUCH_SLOP) {
         job.pause();
-    } else if (x < 150) {
+    } else if (x < JOB_BTN_X2 - UI_TOUCH_SLOP) {
         job.resume();
-    } else if (x < 226) {
+    } else if (x < JOB_BTN_X3 - UI_TOUCH_SLOP) {
         job.stop();
     } else {
         if (job.state() != JobState::Running) {

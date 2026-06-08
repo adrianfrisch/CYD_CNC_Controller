@@ -7,12 +7,13 @@
 // =============================================================================
 
 #include "screen_calibration.h"
+#include "ui_layout.h"
 
-// Calibration target positions (inset 30px from corners)
-static constexpr int TGT1_X = 30;
-static constexpr int TGT1_Y = 30;
-static constexpr int TGT2_X = SCREEN_W - 30;  // 290
-static constexpr int TGT2_Y = SCREEN_H - 30;  // 210
+// Calibration target positions (proportionally inset from corners)
+static constexpr int TGT1_X = CAL_TGT1_X;
+static constexpr int TGT1_Y = CAL_TGT1_Y;
+static constexpr int TGT2_X = CAL_TGT2_X;
+static constexpr int TGT2_Y = CAL_TGT2_Y;
 
 void CalibrationScreen::enter() {
     // Nothing — draw() handles the blocking workflow

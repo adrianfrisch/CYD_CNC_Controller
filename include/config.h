@@ -77,10 +77,17 @@ struct TouchCalData {
 #define WIFI_CONNECT_TIMEOUT_MS  15000  // Max time to wait for connection
 
 // -----------------------------------------------------------------------------
-// UI Layout (320x240 landscape)
+// UI Layout — resolution from build flags (default: 320x240 landscape)
+// Override via platformio.ini: -DUI_SCREEN_W=xxx -DUI_SCREEN_H=yyy
 // -----------------------------------------------------------------------------
-#define SCREEN_W          320
-#define SCREEN_H          240
+#ifndef UI_SCREEN_W
+  #define UI_SCREEN_W     320
+#endif
+#ifndef UI_SCREEN_H
+  #define UI_SCREEN_H     240
+#endif
+#define SCREEN_W          UI_SCREEN_W
+#define SCREEN_H          UI_SCREEN_H
 
 // Colours (RGB565)
 #define CLR_BG            0x0000  // Black

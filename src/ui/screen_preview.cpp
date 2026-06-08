@@ -3,6 +3,7 @@
 // =============================================================================
 
 #include "screen_preview.h"
+#include "ui_layout.h"
 #include "../sd_manager.h"
 #include "../job_streamer.h"
 
@@ -46,7 +47,7 @@ void PreviewScreen::draw() {
     TFT_eSPI& tft = ui.tft();
     UIManager::drawHeader(tft, "GCode Preview");
 
-    tft.setTextSize(1);
+    tft.setTextSize(UI_FONT_SM);
 
     // File info — size only (no slow full-file scan)
     tft.setTextColor(CLR_ACCENT, CLR_BG);
@@ -59,23 +60,23 @@ void PreviewScreen::draw() {
     } else {
         snprintf(info, sizeof(info), "%s  (%d B)", g_selectedFile, (int)_fileSize);
     }
-    tft.drawString(info, 4, 34);
+    tft.drawString(info, UI_MARGIN, PRV_INFO_Y);
 
     // Preview lines
     tft.setTextColor(CLR_TEXT, CLR_BG);
     for (int i = 0; i < _lineCount; i++) {
         char lineDisp[48];
         snprintf(lineDisp, sizeof(lineDisp), "%3d: %.42s", i + 1, _lines[i]);
-        tft.drawString(lineDisp, 4, 50 + i * 16);
+        tft.drawString(lineDisp, UI_MARGIN, PRV_LINES_Y + i * PRV_LINE_SPACING);
     }
     if (_hasMore) {
         tft.setTextColor(CLR_BORDER, CLR_BG);
-        tft.drawString("... more lines in file", 4, 50 + _lineCount * 16);
+        tft.drawString("... more lines in file", UI_MARGIN, PRV_LINES_Y + _lineCount * PRV_LINE_SPACING);
     }
 
     // Buttons
-    Button btnBack  = {4, 210, 70, 26, CLR_BTN, "< BACK"};
-    Button btnStart = {240, 210, 76, 26, CLR_BTN_ACTIVE, "START"};
+    Button btnBack  = {PRV_BTN_BACK_X, UI_BTN_ROW_Y, PRV_BTN_BACK_W, UI_BTN_ROW_H, CLR_BTN, "< BACK"};
+    Button btnStart = {PRV_BTN_START_X, UI_BTN_ROW_Y, PRV_BTN_START_W, UI_BTN_ROW_H, CLR_BTN_ACTIVE, "START"};
 
     UIManager::drawButton(tft, btnBack);
     UIManager::drawButton(tft, btnStart);
@@ -87,12 +88,12 @@ void PreviewScreen::update() {
 
 void PreviewScreen::onTouch(int16_t x, int16_t y) {
     // BACK button
-    if (x < 78 && y >= 210) {
+    if (x < PRV_BTN_BACK_X + PRV_BTN_BACK_W + UI_TOUCH_SLOP && y >= UI_BTN_ROW_Y) {
         ui.switchScreen(ScreenId::FileBrowser);
         return;
     }
     // START button
-    if (x >= 236 && y >= 210) {
+    if (x >= PRV_BTN_START_X - UI_TOUCH_SLOP && y >= UI_BTN_ROW_Y) {
         if (job.startJob(g_selectedFile)) {
             ui.switchScreen(ScreenId::Job);
         }

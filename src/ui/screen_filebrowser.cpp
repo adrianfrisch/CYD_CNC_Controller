@@ -3,6 +3,7 @@
 // =============================================================================
 
 #include "screen_filebrowser.h"
+#include "ui_layout.h"
 #include "../grbl_comm.h"
 #include "../web_server.h"
 
@@ -49,24 +50,24 @@ bool FileBrowserScreen::checkForChanges() {
     return false;
 }
 
-// Button column starts at x=220 (wider buttons, easier to hit)
-static constexpr int BTN_X = 220;
-static constexpr int BTN_W = 96;  // fills to 316
-static constexpr int BTN_H = 30;
-static constexpr int LIST_W = 216; // file list width (0..BTN_X-4)
+// Button layout uses constants from ui_layout.h
+static constexpr int BTN_X = FB_BTN_X;
+static constexpr int BTN_W = FB_BTN_W;
+static constexpr int BTN_H = FB_BTN_H;
+static constexpr int LIST_W = FB_LIST_W;
 
 void FileBrowserScreen::draw() {
     TFT_eSPI& tft = ui.tft();
     UIManager::drawHeader(tft, "CYD CNC - File Browser");
 
     // Status bar at bottom
-    tft.fillRect(0, 220, SCREEN_W, 20, CLR_HEADER);
+    tft.fillRect(0, UI_STATUS_Y, SCREEN_W, UI_STATUS_H, CLR_HEADER);
     tft.setTextColor(CLR_TEXT, CLR_HEADER);
     tft.setTextDatum(ML_DATUM);
-    tft.setTextSize(1);
+    tft.setTextSize(UI_FONT_SM);
 
     const char* stateStr = grbl.isConnected() ? "GRBL OK" : "NO GRBL";
-    tft.drawString(stateStr, 4, 230);
+    tft.drawString(stateStr, UI_MARGIN, UI_STATUS_TEXT_Y);
 
     // Show WiFi IP or SD status
     if (webServer.isConnected()) {
@@ -74,26 +75,26 @@ void FileBrowserScreen::draw() {
         char buf[32];
         snprintf(buf, sizeof(buf), "http://%s", ip.c_str());
         tft.setTextColor(CLR_ACCENT, CLR_HEADER);
-        tft.drawString(buf, 60, 230);
+        tft.drawString(buf, SCREEN_W * 60 / 320, UI_STATUS_TEXT_Y);
     } else if (sdCard.isReady()) {
         char buf[32];
         snprintf(buf, sizeof(buf), "SD:%d files", _fileCount);
-        tft.drawString(buf, 60, 230);
+        tft.drawString(buf, SCREEN_W * 60 / 320, UI_STATUS_TEXT_Y);
     } else {
-        tft.drawString("NO SD CARD", 60, 230);
+        tft.drawString("NO SD CARD", SCREEN_W * 60 / 320, UI_STATUS_TEXT_Y);
     }
 
     // Calibrate touch button in status bar
     tft.setTextColor(CLR_BORDER, CLR_HEADER);
     tft.setTextDatum(MR_DATUM);
-    tft.drawString("[CAL]", SCREEN_W - 4, 230);
+    tft.drawString("[CAL]", SCREEN_W - UI_MARGIN, UI_STATUS_TEXT_Y);
 
-    // Right-side buttons — no more RFSH, DEL takes its spot
-    Button btnJog   = {BTN_X, 28,  BTN_W, BTN_H, CLR_BTN,        "JOG"};
-    Button btnUp    = {BTN_X, 62,  BTN_W, BTN_H, CLR_BTN,        "UP"};
-    Button btnDown  = {BTN_X, 96,  BTN_W, BTN_H, CLR_BTN,        "DOWN"};
-    Button btnOpen  = {BTN_X, 130, BTN_W, BTN_H, CLR_BTN_ACTIVE, "OPEN",  _selectedIndex >= 0};
-    Button btnDel   = {BTN_X, 168, BTN_W, BTN_H, CLR_BTN_DANGER,
+    // Right-side buttons
+    Button btnJog   = {BTN_X, FB_BTN_Y0, BTN_W, BTN_H, CLR_BTN,        "JOG"};
+    Button btnUp    = {BTN_X, FB_BTN_Y1, BTN_W, BTN_H, CLR_BTN,        "UP"};
+    Button btnDown  = {BTN_X, FB_BTN_Y2, BTN_W, BTN_H, CLR_BTN,        "DOWN"};
+    Button btnOpen  = {BTN_X, FB_BTN_Y3, BTN_W, BTN_H, CLR_BTN_ACTIVE, "OPEN",  _selectedIndex >= 0};
+    Button btnDel   = {BTN_X, FB_BTN_Y4, BTN_W, BTN_H, CLR_BTN_DANGER,
                        _confirmDelete ? "CONFIRM?" : "DEL",
                        _selectedIndex >= 0};
 
@@ -110,21 +111,21 @@ void FileBrowserScreen::drawFileList() {
     TFT_eSPI& tft = ui.tft();
 
     int startIdx = _page * FILES_PER_PAGE;
-    int y = 28;
+    int y = FB_LIST_TOP;
 
     for (int i = 0; i < FILES_PER_PAGE; i++) {
         int idx = startIdx + i;
-        tft.fillRect(0, y, LIST_W, 30, (idx == _selectedIndex) ? CLR_BTN : CLR_BG);
+        tft.fillRect(0, y, LIST_W, FB_ROW_H - 1, (idx == _selectedIndex) ? CLR_BTN : CLR_BG);
 
         if (idx < _fileCount) {
             tft.setTextColor(CLR_TEXT, (idx == _selectedIndex) ? CLR_BTN : CLR_BG);
             tft.setTextDatum(ML_DATUM);
-            tft.setTextSize(1);
+            tft.setTextSize(UI_FONT_SM);
 
             // Filename (truncated)
             char display[30];
             snprintf(display, sizeof(display), "%.24s", _files[idx].name);
-            tft.drawString(display, 4, y + 15);
+            tft.drawString(display, UI_MARGIN, y + FB_ROW_H / 2);
 
             // File size
             char sizeStr[16];
@@ -136,11 +137,11 @@ void FileBrowserScreen::drawFileList() {
                 snprintf(sizeStr, sizeof(sizeStr), "%dB", (int)_files[idx].size);
             }
             tft.setTextDatum(MR_DATUM);
-            tft.drawString(sizeStr, LIST_W - 4, y + 15);
+            tft.drawString(sizeStr, LIST_W - UI_MARGIN, y + FB_ROW_H / 2);
         }
 
-        tft.drawLine(0, y + 30, LIST_W, y + 30, CLR_BORDER);
-        y += 31;
+        tft.drawLine(0, y + FB_ROW_H - 1, LIST_W, y + FB_ROW_H - 1, CLR_BORDER);
+        y += FB_ROW_H;
     }
 
     // Page indicator
@@ -150,7 +151,7 @@ void FileBrowserScreen::drawFileList() {
     snprintf(pageStr, sizeof(pageStr), "%d/%d", _page + 1, totalPages);
     tft.setTextColor(CLR_TEXT, CLR_BG);
     tft.setTextDatum(MC_DATUM);
-    tft.drawString(pageStr, LIST_W / 2, 216);
+    tft.drawString(pageStr, LIST_W / 2, FB_PAGE_IND_Y);
 }
 
 void FileBrowserScreen::update() {
@@ -174,8 +175,8 @@ void FileBrowserScreen::update() {
 
 void FileBrowserScreen::onTouch(int16_t x, int16_t y) {
     // File list area (left column)
-    if (x < LIST_W && y >= 28 && y < 214) {
-        int row = (y - 28) / 31;
+    if (x < LIST_W && y >= FB_LIST_TOP && y < FB_LIST_BOTTOM) {
+        int row = (y - FB_LIST_TOP) / FB_ROW_H;
         int idx = _page * FILES_PER_PAGE + row;
         if (idx < _fileCount) {
             _selectedIndex = (_selectedIndex == idx) ? -1 : idx; // toggle
@@ -186,25 +187,25 @@ void FileBrowserScreen::onTouch(int16_t x, int16_t y) {
         return;
     }
 
-    // Right-side buttons (generous hit area: x >= BTN_X - 4)
-    if (x >= BTN_X - 4) {
-        if (y >= 28 && y < 58) {
+    // Right-side buttons (generous hit area: x >= BTN_X - UI_TOUCH_SLOP)
+    if (x >= BTN_X - UI_TOUCH_SLOP) {
+        if (y >= FB_BTN_Y0 && y < FB_BTN_Y0 + BTN_H) {
             // JOG button
             ui.switchScreen(ScreenId::Jog);
-        } else if (y >= 58 && y < 92) {
+        } else if (y >= FB_BTN_Y1 && y < FB_BTN_Y1 + BTN_H) {
             // UP (previous page)
             if (_page > 0) { _page--; _selectedIndex = -1; _confirmDelete = false; _needsRedraw = true; }
-        } else if (y >= 92 && y < 126) {
+        } else if (y >= FB_BTN_Y2 && y < FB_BTN_Y2 + BTN_H) {
             // DOWN (next page)
             int totalPages = (_fileCount + FILES_PER_PAGE - 1) / FILES_PER_PAGE;
             if (_page < totalPages - 1) { _page++; _selectedIndex = -1; _confirmDelete = false; _needsRedraw = true; }
-        } else if (y >= 126 && y < 164 && _selectedIndex >= 0) {
+        } else if (y >= FB_BTN_Y3 && y < FB_BTN_Y3 + BTN_H && _selectedIndex >= 0) {
             // OPEN — go to preview screen
             Serial.printf("[FB] Opening: %s\n", _files[_selectedIndex].name);
             snprintf(g_selectedFile, MAX_FILENAME, "/%s", _files[_selectedIndex].name);
             _confirmDelete = false;
             ui.switchScreen(ScreenId::Preview);
-        } else if (y >= 164 && y < 200 && _selectedIndex >= 0) {
+        } else if (y >= FB_BTN_Y4 && y < FB_BTN_Y4 + BTN_H && _selectedIndex >= 0) {
             // DELETE — requires confirmation
             if (_confirmDelete) {
                 char path[MAX_FILENAME + 2];
@@ -223,7 +224,7 @@ void FileBrowserScreen::onTouch(int16_t x, int16_t y) {
     }
 
     // [CAL] button in status bar
-    if (x >= SCREEN_W - 60 && y >= 220) {
+    if (x >= SCREEN_W - SCREEN_W * 60 / 320 && y >= UI_STATUS_Y) {
         ui.runCalibration();
     }
 }
