@@ -99,11 +99,23 @@ void JobStreamer::resume() {
 
 void JobStreamer::stop() {
     if (_state == JobState::Running || _state == JobState::Paused) {
+        // Close the file BEFORE sending reset — prevents any further reads
+        _file.close();
+
+        // Send soft reset to GRBL — this clears GRBL's buffers and
+        // resets its serial protocol state (character-counting, etc.)
         grbl.softReset();
+
+        // Fully reset streamer state so a new job or jog can start cleanly
         _state = JobState::Idle;
         _endTime = millis();
         _waitingForOk = false;
-        _file.close();
+        _currentCmd[0] = '\0';
+        _bytesRead = 0;
+        _fileSize = 0;
+        _currentLine = 0;
+        _totalLines = 0;
+
         Serial.println("[JOB] Stopped");
         if (_doneCb) _doneCb(false);
     }

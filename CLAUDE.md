@@ -122,10 +122,7 @@ When adding testable logic:
 
 ## Known Issues (don't duplicate these bugs)
 
-- Jog screen: SET 0 and GO 0 commands don't work
 - Homing ($H) is untested
-- Z-axis microstep too small for metric (should be 0.05mm)
-- After stopping a job, jog and starting another job fails
 
 ## Files You Should NOT Modify Without Asking
 

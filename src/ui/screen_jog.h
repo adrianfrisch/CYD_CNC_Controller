@@ -32,7 +32,7 @@ private:
     static constexpr float FEEDS[] = {50.0f, 100.0f, 500.0f, 1000.0f, 2000.0f, 3000.0f, 5000.0f};
     static constexpr int NUM_FEEDS = 7;
 
-    static constexpr float Z_MICRO_STEP = 0.01f;   // mm — for Z touch-off probing
+    static constexpr float Z_MICRO_STEP = 0.05f;   // mm — for Z touch-off probing
     static constexpr float Z_MICRO_FEED = 50.0f;    // mm/min — slow feed for micro jog
 
     float zFeed() const { return _jogFeed / JOG_Z_FEED_DIVISOR; }

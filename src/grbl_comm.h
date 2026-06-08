@@ -77,6 +77,7 @@ private:
     void processIncoming();
     void parseLine(const char* line);
     void parseStatus(const char* line);
+    void flushInput();
     GrblState parseState(const char* s);
 
     GrblStatus    _status;
@@ -96,6 +97,12 @@ private:
     int    _sentHead = 0;
     int    _sentTail = 0;
     int    _sentCount = 0;
+    bool   _postResetUnlock = false;  // auto-send $X after next "Grbl " banner
+
+    // Work Coordinate Offset — updated from WCO: field in status reports.
+    // Used to derive WPos when GRBL reports MPos ($10=1, the Arduino default).
+    // WPos = MPos - WCO
+    float  _wcoX = 0, _wcoY = 0, _wcoZ = 0;
 };
 
 extern GrblComm grbl;

@@ -131,3 +131,29 @@ bool parseWiFiConfig(const char* configData,
  */
 int strcasecmp_portable(const char* s1, const char* s2);
 
+// ============================================================================
+// Machine Config Parsing Functions
+// ============================================================================
+
+/**
+ * Machine configuration — features supported by the connected CNC
+ */
+struct MachineConfig {
+    bool homingEnabled = true;   // Does the machine support $H homing?
+};
+
+/**
+ * Parse machine configuration from a config string (key=value format)
+ * @param configData Configuration data
+ * @param config Output configuration structure
+ * @return true if parsing succeeded (even if no keys matched — defaults are valid)
+ */
+bool parseMachineConfig(const char* configData, MachineConfig& config);
+
+/**
+ * Parse a boolean value string (yes/true/1 → true, no/false/0 → false)
+ * @param val Value string
+ * @param out Output boolean
+ * @return true if the value was recognized
+ */
+bool parseBoolValue(const char* val, bool& out);

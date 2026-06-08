@@ -4,6 +4,7 @@
 
 #include "screen_jog.h"
 #include "../grbl_comm.h"
+#include "../machine_config.h"
 
 constexpr float JogScreen::STEPS[];
 constexpr float JogScreen::FEEDS[];
@@ -57,8 +58,8 @@ void JogScreen::draw() {
 
     // --- Z Microstep buttons (far right, for touch-off zeroing) ---
     int zmx = 266;
-    Button btnZuP = {zmx, padY,                       50, bh, CLR_BTN_ACTIVE, "Z+.01"};
-    Button btnZuM = {zmx, padY + bh + gap + bh + gap, 50, bh, CLR_BTN_ACTIVE, "Z-.01"};
+    Button btnZuP = {zmx, padY,                       50, bh, CLR_BTN_ACTIVE, "Z+.05"};
+    Button btnZuM = {zmx, padY + bh + gap + bh + gap, 50, bh, CLR_BTN_ACTIVE, "Z-.05"};
 
     UIManager::drawButton(tft, btnZuP);
     UIManager::drawButton(tft, btnZuM);
@@ -75,7 +76,7 @@ void JogScreen::draw() {
     Button btnSetZero  = {4,   210, 56, 26, CLR_BTN_ACTIVE, "SET 0"};
     Button btnSetZ0    = {64,  210, 56, 26, CLR_BTN_ACTIVE, "SET Z0"};
     Button btnGoZero   = {124, 210, 56, 26, CLR_BTN,        "GO 0"};
-    Button btnHome     = {184, 210, 56, 26, CLR_BTN_WARN,   "HOME"};
+    Button btnHome     = {184, 210, 56, 26, CLR_BTN_WARN,   "HOME", machineConfig.homingEnabled()};
     Button btnFiles    = {260, 210, 56, 26, CLR_BTN,         "FILES"};
 
     UIManager::drawButton(tft, btnSetZero);
@@ -249,13 +250,30 @@ void JogScreen::onTouch(int16_t x, int16_t y) {
     // --- Bottom buttons ---
     if (y >= 210) {
         if (x < 60) {
+            // Cancel any in-progress jog first — GRBL must be Idle before
+            // it will execute a G10 work-coordinate command.
+            grbl.jogCancel();
             grbl.setZero(); // SET 0 (all axes)
+            // Force immediate position refresh: request fresh status and
+            // bypass the 300ms display throttle so 0,0,0 appears right away.
+            grbl.requestStatus();
+            _prevX = _prevY = _prevZ = -9999;
+            _lastUpdate = 0;
         } else if (x < 120) {
+            grbl.jogCancel();
             grbl.setZeroZ(); // SET Z0 (Z axis only)
+            grbl.requestStatus();
+            _prevZ = -9999;
+            _lastUpdate = 0;
         } else if (x < 180) {
+            // Cancel jog so GRBL is Idle and ready to accept a G0 move.
+            grbl.jogCancel();
             grbl.goToZero(); // GO 0
         } else if (x < 240) {
-            grbl.homeMachine(); // HOME
+            if (machineConfig.homingEnabled()) {
+                grbl.jogCancel();
+                grbl.homeMachine(); // HOME
+            }
         } else {
             ui.switchScreen(ScreenId::FileBrowser); // FILES
         }

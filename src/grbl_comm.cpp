@@ -97,7 +97,25 @@ void GrblComm::sendRealtime(char c) {
 #endif
 }
 
-void GrblComm::softReset()    { sendRealtime(0x18); _grblBufFree = GRBL_RX_BUFFER; _sentCount = 0; _sentHead = _sentTail = 0; }
+void GrblComm::softReset() {
+    sendRealtime(0x18);
+    // Clear character-counting state
+    _grblBufFree = GRBL_RX_BUFFER;
+    _sentCount = 0;
+    _sentHead = _sentTail = 0;
+    // Flush partial RX data — a half-received line would corrupt the
+    // GRBL welcome message that follows the reset
+    _rxPos = 0;
+    // Mark disconnected; the GRBL welcome banner ("Grbl 1.1h ...")
+    // arriving in parseLine() will set _connected = true again
+    _connected = false;
+    _status.state = GrblState::Unknown;
+    // GRBL 1.1 enters ALARM state when soft-reset during motion.
+    // Set flag so we send $X as soon as we see the "Grbl " welcome banner.
+    _postResetUnlock = true;
+    // Drain any stale bytes already in the serial hardware buffer
+    flushInput();
+}
 void GrblComm::feedHold()     { sendRealtime('!'); }
 void GrblComm::cycleResume()  { sendRealtime('~'); }
 void GrblComm::requestStatus(){ sendRealtime('?'); }
@@ -121,6 +139,21 @@ void GrblComm::setZeroZ() {
 
 void GrblComm::goToZero() {
     sendLine("G90 G0 X0 Y0 Z0");
+}
+
+// ---------------------------------------------------------------------------
+// Serial buffer maintenance
+// ---------------------------------------------------------------------------
+
+void GrblComm::flushInput() {
+#if !(DEVELOP_MODE && !DEBUG_SERIAL_GRBL)
+    // Drain any bytes already sitting in the serial hardware FIFO.
+    // After a soft-reset the controller may still be sending the tail
+    // end of a previous response or status report.
+    while (GRBL_PORT.available()) {
+        GRBL_PORT.read();
+    }
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -181,17 +214,30 @@ void GrblComm::parseLine(const char* line) {
         _status.state = GrblState::Alarm;
         DBG("GRBL ALARM: %s", line);
     } else if (strncmp(line, "Grbl ", 5) == 0) {
-        // GRBL startup message — reset buffer tracking
+        // GRBL startup message — reset buffer tracking and mark connected
         _grblBufFree = GRBL_RX_BUFFER;
         _sentCount = 0;
         _sentHead = _sentTail = 0;
+        _connected = true;
+        _status.state = GrblState::Unknown;  // will be updated by next status poll
         DBG("GRBL Controller connected: %s", line);
+        // If this banner followed a soft-reset, GRBL may be in ALARM state
+        // (GRBL 1.1 enters ALARM when reset during motion). $X exits the alarm
+        // so jog and gcode work immediately without a manual unlock step.
+        if (_postResetUnlock) {
+            _postResetUnlock = false;
+            sendLine("$X");
+            DBG("GRBL post-reset alarm unlock sent ($X)");
+        }
     }
 
     if (_responseCb) _responseCb(line);
 }
 
-// Parse: <Idle|WPos:0.000,0.000,0.000|Bf:15,128|FS:0,0|Ov:100,100,100>
+// GRBL 1.1 status formats:
+//   $10=0  → <Idle|WPos:x,y,z|Bf:n,m|FS:f,s>          (work position directly)
+//   $10=1  → <Idle|MPos:x,y,z|Bf:n,m|FS:f,s|WCO:x,y,z> (machine pos + offset)
+// WPos = MPos - WCO.  WCO is sent whenever the offset changes and periodically.
 void GrblComm::parseStatus(const char* line) {
     char buf[256];
     strncpy(buf, line, sizeof(buf) - 1);
@@ -209,16 +255,22 @@ void GrblComm::parseStatus(const char* line) {
         _status.state = parseState(tok);
     }
 
+    bool hasMPos = false;
+    bool hasWPos = false;
+
     // Remaining tokens
     while ((tok = strtok(nullptr, "|")) != nullptr) {
         if (strncmp(tok, "WPos:", 5) == 0) {
             sscanf(tok + 5, "%f,%f,%f", &_status.wposX, &_status.wposY, &_status.wposZ);
+            hasWPos = true;
         } else if (strncmp(tok, "MPos:", 5) == 0) {
             sscanf(tok + 5, "%f,%f,%f", &_status.mposX, &_status.mposY, &_status.mposZ);
-            // If WPos not reported, copy MPos (simplified)
-            _status.wposX = _status.mposX;
-            _status.wposY = _status.mposY;
-            _status.wposZ = _status.mposZ;
+            hasMPos = true;
+        } else if (strncmp(tok, "WCO:", 4) == 0) {
+            // Work Coordinate Offset — store so we can derive WPos from MPos.
+            // G10 L20 changes this offset; the next status report carries the new WCO.
+            sscanf(tok + 4, "%f,%f,%f", &_wcoX, &_wcoY, &_wcoZ);
+            DBG("GRBL WCO updated: %.3f, %.3f, %.3f", _wcoX, _wcoY, _wcoZ);
         } else if (strncmp(tok, "Bf:", 3) == 0) {
             sscanf(tok + 3, "%d,%d", &_status.bufferAvail, &_status.rxAvail);
         } else if (strncmp(tok, "FS:", 3) == 0) {
@@ -230,6 +282,14 @@ void GrblComm::parseStatus(const char* line) {
                    &_status.rapidOverride, &_status.spindleOverride);
             _status.overrides = true;
         }
+    }
+
+    // If GRBL reported MPos (not WPos), derive WPos = MPos - WCO.
+    // This is the correct calculation for $10=1 mode (Arduino GRBL default).
+    if (hasMPos && !hasWPos) {
+        _status.wposX = _status.mposX - _wcoX;
+        _status.wposY = _status.mposY - _wcoY;
+        _status.wposZ = _status.mposZ - _wcoZ;
     }
 
     if (_statusCb) _statusCb(_status);

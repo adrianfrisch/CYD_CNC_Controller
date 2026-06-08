@@ -232,3 +232,85 @@ bool parseWiFiConfig(const char* configData,
     return ssidOut[0] != '\0';
 }
 
+// ============================================================================
+// Machine Config Parsing Functions
+// ============================================================================
+
+bool parseBoolValue(const char* val, bool& out) {
+    if (!val) return false;
+    if (strcasecmp_portable(val, "yes") == 0 ||
+        strcasecmp_portable(val, "true") == 0 ||
+        strcmp(val, "1") == 0) {
+        out = true;
+        return true;
+    }
+    if (strcasecmp_portable(val, "no") == 0 ||
+        strcasecmp_portable(val, "false") == 0 ||
+        strcmp(val, "0") == 0) {
+        out = false;
+        return true;
+    }
+    return false;
+}
+
+bool parseMachineConfig(const char* configData, MachineConfig& config) {
+    if (!configData) return false;
+
+    // Start with defaults
+    config = MachineConfig{};
+
+    // Work with a copy
+    size_t dataLen = strlen(configData);
+    char* buf = new char[dataLen + 1];
+    strcpy(buf, configData);
+
+    // Process line by line
+    char* line = strtok(buf, "\n");
+    while (line) {
+        // Trim leading whitespace
+        while (*line == ' ' || *line == '\t') line++;
+
+        // Skip comments and empty lines
+        if (*line == '#' || *line == '\0' || *line == '\r') {
+            line = strtok(nullptr, "\n");
+            continue;
+        }
+
+        // Find '=' separator
+        char* eq = strchr(line, '=');
+        if (!eq) {
+            line = strtok(nullptr, "\n");
+            continue;
+        }
+
+        // Split key and value
+        *eq = '\0';
+        char* key = line;
+        char* val = eq + 1;
+
+        // Trim whitespace from key
+        while (*key == ' ' || *key == '\t') key++;
+        char* keyEnd = eq - 1;
+        while (keyEnd > key && (*keyEnd == ' ' || *keyEnd == '\t')) {
+            *keyEnd = '\0';
+            keyEnd--;
+        }
+
+        // Trim whitespace from value
+        while (*val == ' ' || *val == '\t') val++;
+        size_t valLen = strlen(val);
+        while (valLen > 0 && (val[valLen-1] == ' ' || val[valLen-1] == '\t' || val[valLen-1] == '\r')) {
+            val[--valLen] = '\0';
+        }
+
+        // Match keys
+        if (strcasecmp_portable(key, "HOMING") == 0) {
+            parseBoolValue(val, config.homingEnabled);
+        }
+
+        line = strtok(nullptr, "\n");
+    }
+
+    delete[] buf;
+    return true;
+}

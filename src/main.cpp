@@ -18,6 +18,7 @@
 #include "sd_manager.h"
 #include "job_streamer.h"
 #include "web_server.h"
+#include "machine_config.h"
 #include "ui/ui_manager.h"
 
 void setup() {
@@ -46,6 +47,10 @@ void setup() {
     // Initialize job streamer
     Serial.println("[INIT] Job streamer...");
     job.begin();
+
+    // Load machine configuration
+    Serial.println("[INIT] Machine config...");
+    machineConfig.begin();
 
     // Initialize display & UI
     Serial.println("[INIT] Display & UI...");

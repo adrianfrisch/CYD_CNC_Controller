@@ -14,17 +14,14 @@ Upload GCode files over WiFi, preview them on the touchscreen, and run jobs — 
 > to your equipment or injury. Use at your own risk.
 
 ## Current status of the project
-I am currently testing the controller with my GRBL firmware based eggbot before moving on to my real CNC. 
+I am currently testing the controller with my GRBL firmware based CNC machines. 
 I successfully ran a couple of .nc files successfully. But test and use at your own risk. 
 The configuration for your CYD needs to be adjusted in the platformio.ini file to match your model. 
 
 --- 
 
 ## Know Issues
-- On the jog display, the set Zero and return to zero commands do not work
 - Home is untested. My CNC machine does not support homing
-- The Z-Axis stepping to find the Z zero position is far too small (for metric). Change for .05 or so
-- After stopping a job in the job screen, the jog and starting another job does not work.
 
 ## Improvement ideas
 - Also add buttons on the jog screen for diagonal movements
