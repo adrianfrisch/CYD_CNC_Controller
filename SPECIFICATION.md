@@ -365,7 +365,7 @@ The CNC Shield v3.0 stacks directly on the Arduino Uno's pin headers. The serial
 | Position readout     | Below feed     | `X: Y: Z: [State]` — updates every 300 ms |
 | SET 0 button         | Bottom row     | Sets current position as work zero for all axes (`G10 L20 P1 X0 Y0 Z0`) |
 | SET Z0 button        | Bottom row     | Sets current Z position as Z work zero only (`G10 L20 P1 Z0`) |
-| GO 0 button          | Bottom row     | Rapid move to work zero (`G90 G0 X0 Y0 Z0`) |
+| GO 0 button          | Bottom row     | Rapid move to work zero — if `CLEARANCE_HEIGHT` > 0 in machine.cfg, Z raises to clearance height first, then XY moves to zero, then Z lowers to zero |
 | HOME button          | Bottom row     | Homes all axes (`$H`) |
 | FILES button         | Bottom row     | Return to File Browser |
 
@@ -451,7 +451,14 @@ All configuration is defined in `include/config.h`:
 | `SCREEN_W`            | 320           | Display width (landscape) — override with `-DUI_SCREEN_W=xxx` |
 | `SCREEN_H`            | 240           | Display height (landscape) — override with `-DUI_SCREEN_H=yyy` |
 
-### 6.1 UI Color Scheme (RGB565)
+### 6.1 Machine Configuration (`/machine.cfg` on SPIFFS)
+
+| Parameter             | Default Value | Description |
+|-----------------------|---------------|-------------|
+| `HOMING`              | `yes`         | Enable/disable homing (`$H`) button |
+| `CLEARANCE_HEIGHT`    | `0`           | Z safe height (mm) for GO 0 moves. When > 0, return-to-zero raises Z to this height before moving XY, then lowers Z to zero. Set to 0 to move all axes simultaneously. |
+
+### 6.2 UI Color Scheme (RGB565)
 
 | Constant          | Value    | Color    | Usage |
 |-------------------|----------|----------|-------|

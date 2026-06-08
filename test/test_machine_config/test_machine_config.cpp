@@ -184,6 +184,53 @@ void test_machine_config_full_example(void) {
 }
 
 // ============================================================================
+// Test: parseMachineConfig() — Clearance Height
+// ============================================================================
+
+void test_machine_config_clearance_height_default(void) {
+    const char* config = "";
+    MachineConfig cfg;
+    TEST_ASSERT_TRUE(parseMachineConfig(config, cfg));
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.0f, cfg.clearanceHeight);
+}
+
+void test_machine_config_clearance_height_set(void) {
+    const char* config = "CLEARANCE_HEIGHT=10.0\n";
+    MachineConfig cfg;
+    TEST_ASSERT_TRUE(parseMachineConfig(config, cfg));
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 10.0f, cfg.clearanceHeight);
+}
+
+void test_machine_config_clearance_height_integer(void) {
+    const char* config = "CLEARANCE_HEIGHT=5\n";
+    MachineConfig cfg;
+    TEST_ASSERT_TRUE(parseMachineConfig(config, cfg));
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 5.0f, cfg.clearanceHeight);
+}
+
+void test_machine_config_clearance_height_zero_disabled(void) {
+    const char* config = "CLEARANCE_HEIGHT=0\n";
+    MachineConfig cfg;
+    TEST_ASSERT_TRUE(parseMachineConfig(config, cfg));
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.0f, cfg.clearanceHeight);
+}
+
+void test_machine_config_clearance_height_with_homing(void) {
+    const char* config = "HOMING=yes\nCLEARANCE_HEIGHT=15.5\n";
+    MachineConfig cfg;
+    TEST_ASSERT_TRUE(parseMachineConfig(config, cfg));
+    TEST_ASSERT_TRUE(cfg.homingEnabled);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 15.5f, cfg.clearanceHeight);
+}
+
+void test_machine_config_clearance_height_case_insensitive(void) {
+    const char* config = "clearance_height=20\n";
+    MachineConfig cfg;
+    TEST_ASSERT_TRUE(parseMachineConfig(config, cfg));
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 20.0f, cfg.clearanceHeight);
+}
+
+// ============================================================================
 // Test Runner
 // ============================================================================
 
@@ -222,6 +269,14 @@ int main(int argc, char** argv) {
     RUN_TEST(test_machine_config_case_insensitive_key);
     RUN_TEST(test_machine_config_unknown_key_ignored);
     RUN_TEST(test_machine_config_full_example);
+
+    // parseMachineConfig tests — clearance height
+    RUN_TEST(test_machine_config_clearance_height_default);
+    RUN_TEST(test_machine_config_clearance_height_set);
+    RUN_TEST(test_machine_config_clearance_height_integer);
+    RUN_TEST(test_machine_config_clearance_height_zero_disabled);
+    RUN_TEST(test_machine_config_clearance_height_with_homing);
+    RUN_TEST(test_machine_config_clearance_height_case_insensitive);
 
     return UNITY_END();
 }

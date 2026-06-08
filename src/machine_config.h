@@ -13,6 +13,7 @@ public:
     void begin();
 
     bool homingEnabled() const { return _config.homingEnabled; }
+    float clearanceHeight() const { return _config.clearanceHeight; }
     const MachineConfig& config() const { return _config; }
 
 private:

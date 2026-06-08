@@ -24,7 +24,6 @@ The configuration for your CYD needs to be adjusted in the platformio.ini file t
 - Home is untested. My CNC machine does not support homing
 
 ## Improvement ideas
-- Include a clearance height in the machine config. When I press return to zero, the Z-axis should move the z-axis first to this safe height before moving x and y. Then after the move, the z should move to zero. 
 
 ---
 
@@ -242,7 +241,7 @@ File Browser  ──OPEN──→  Preview  ──START──→  Job
 - **Feed rate** — tap **–** / **+** to cycle through 50, 100, 500, 1000, 2000, 3000, 5000 mm/min; Z feed is shown automatically (XY ÷ 2)
 - **SET 0** — set current position as work zero (all axes)
 - **SET Z0** — set current Z position as Z work zero only (for after touch-off)
-- **GO 0** — rapid move to work zero
+- **GO 0** — rapid move to work zero (uses safe clearance height if configured in `machine.cfg`)
 - **HOME** — trigger GRBL homing cycle (`$H`)
 - **FILES** — return to File Browser
 

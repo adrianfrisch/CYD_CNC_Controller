@@ -3,6 +3,7 @@
 // =============================================================================
 
 #include "grbl_comm.h"
+#include "machine_config.h"
 #include <cstring>
 #include <cstdio>
 
@@ -138,7 +139,17 @@ void GrblComm::setZeroZ() {
 }
 
 void GrblComm::goToZero() {
-    sendLine("G90 G0 X0 Y0 Z0");
+    float clearance = machineConfig.clearanceHeight();
+    if (clearance > 0.0f) {
+        // Safe return-to-zero: raise Z to clearance height, move XY, lower Z
+        char buf[64];
+        snprintf(buf, sizeof(buf), "G90 G0 Z%.3f", clearance);
+        sendLine(buf);
+        sendLine("G90 G0 X0 Y0");
+        sendLine("G90 G0 Z0");
+    } else {
+        sendLine("G90 G0 X0 Y0 Z0");
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -306,6 +306,9 @@ bool parseMachineConfig(const char* configData, MachineConfig& config) {
         // Match keys
         if (strcasecmp_portable(key, "HOMING") == 0) {
             parseBoolValue(val, config.homingEnabled);
+        } else if (strcasecmp_portable(key, "CLEARANCE_HEIGHT") == 0) {
+            float h = (float)atof(val);
+            if (h >= 0.0f) config.clearanceHeight = h;
         }
 
         line = strtok(nullptr, "\n");

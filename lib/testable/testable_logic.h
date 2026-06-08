@@ -139,7 +139,8 @@ int strcasecmp_portable(const char* s1, const char* s2);
  * Machine configuration — features supported by the connected CNC
  */
 struct MachineConfig {
-    bool homingEnabled = true;   // Does the machine support $H homing?
+    bool homingEnabled = true;       // Does the machine support $H homing?
+    float clearanceHeight = 0.0f;    // Z safe height for return-to-zero moves (0 = disabled)
 };
 
 /**

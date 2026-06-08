@@ -10,8 +10,9 @@ MachineConfigManager machineConfig;
 
 void MachineConfigManager::begin() {
     if (loadConfig()) {
-        Serial.printf("[CFG] Machine config loaded: homing=%s\n",
-                      _config.homingEnabled ? "yes" : "no");
+        Serial.printf("[CFG] Machine config loaded: homing=%s, clearance=%.1fmm\n",
+                      _config.homingEnabled ? "yes" : "no",
+                      _config.clearanceHeight);
     } else {
         Serial.println("[CFG] No machine.cfg found — using defaults");
     }
