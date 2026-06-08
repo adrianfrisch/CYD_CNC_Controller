@@ -100,9 +100,9 @@ HSPI ──→ SD Card               (GPIO 23/19/18/5,  4 MHz)
 
 ```
 platformio.ini build flags
-    │  -DUI_SCREEN_W=xxx -DUI_SCREEN_H=yyy
+    │  -DTFT_WIDTH=240 -DTFT_HEIGHT=320  (portrait dimensions for TFT driver)
     ▼
-config.h ──→ SCREEN_W, SCREEN_H (defaults to 320×240)
+config.h ──→ SCREEN_W = TFT_HEIGHT, SCREEN_H = TFT_WIDTH (swapped for landscape)
     │
     ▼
 ui_layout.h ──→ All layout constants (proportional to resolution)
@@ -112,6 +112,7 @@ screen_*.cpp ──→ Use layout constants only, no hardcoded pixel values
 ```
 
 Supported resolutions: 320×240 (CYD 2.8"), 480×320 (CYD 3.5"), 800×480 (7"), or custom.
+To change resolution, set `-DTFT_WIDTH=<portrait_h> -DTFT_HEIGHT=<portrait_w>` in platformio.ini.
 Font sizes auto-scale: `UI_FONT_MD`/`UI_FONT_LG` increase at ≥480px width.
 
 ## Screen Navigation State Machine

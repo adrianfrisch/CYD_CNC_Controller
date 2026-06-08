@@ -3,8 +3,9 @@
 // UI Layout Constants — Resolution-independent layout derived from build flags
 //
 // All UI positioning, sizing, and spacing is computed from SCREEN_W and SCREEN_H
-// (defined in config.h from build flags). To support a different display, only
-// the build flags need to change — all layout adapts automatically.
+// (defined in config.h, derived from TFT_WIDTH/TFT_HEIGHT build flags swapped
+// to landscape). To support a different display, only the build flags need to
+// change — all layout adapts automatically.
 // =============================================================================
 
 #include "config.h"

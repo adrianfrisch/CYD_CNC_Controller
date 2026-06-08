@@ -530,6 +530,6 @@ The ESP32-2432S028R uses three separate SPI peripherals:
 8. **No OTA updates:** Firmware must be flashed via USB-C cable.
 9. **3-axis only:** No 4th axis (A-axis) support.
 10. **No file transfer over serial:** Files can only be uploaded via WiFi web interface.
-11. **Display driver fixed at compile time:** Changing display hardware requires updating TFT_eSPI build flags in `platformio.ini` and rebuilding. Resolution is configured via `-DUI_SCREEN_W` / `-DUI_SCREEN_H` build flags.
+11. **Display driver fixed at compile time:** Changing display hardware requires updating TFT_eSPI build flags (`-DTFT_WIDTH` / `-DTFT_HEIGHT`) in `platformio.ini` and rebuilding. The landscape resolution is derived automatically (`SCREEN_W = TFT_HEIGHT`, `SCREEN_H = TFT_WIDTH`).
 12. **Landscape only:** All display sizes are assumed landscape orientation.
 

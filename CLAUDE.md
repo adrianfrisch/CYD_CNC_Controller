@@ -80,11 +80,11 @@ Follow these strictly when generating code:
 
 ### Display Resolution Configuration
 
-Resolution is set via PlatformIO build flags — no code changes needed:
+Resolution is set via PlatformIO build flags (portrait dimensions — swapped to landscape in `config.h`):
 
 ```ini
-; platformio.ini example for 3.5" display
-build_flags = -DUI_SCREEN_W=480 -DUI_SCREEN_H=320
+; platformio.ini example for 3.5" display (portrait: 320×480 → landscape: 480×320)
+build_flags = -DTFT_WIDTH=320 -DTFT_HEIGHT=480
 ```
 
 All UI layout is proportional via `src/ui/ui_layout.h`. Never hardcode pixel positions in screen code.
