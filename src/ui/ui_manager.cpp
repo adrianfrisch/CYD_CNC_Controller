@@ -31,9 +31,13 @@ void UIManager::begin() {
     _tft.setBrightness(255);
 #endif
 
-    // Initialize touch (software SPI — avoids HSPI conflict with SD card)
+    // Initialize touch
     _touch.begin();
+#ifdef USE_GT911_TOUCH
+    DebugSerial.println("[UI] GT911 capacitive touch initialized (I2C)");
+#else
     DebugSerial.println("[UI] XPT2046 touch initialized (software SPI)");
+#endif
 
     // Create screens
     _screens[(int)ScreenId::FileBrowser] = new FileBrowserScreen();
@@ -43,7 +47,12 @@ void UIManager::begin() {
     _screens[(int)ScreenId::Calibration] = new CalibrationScreen();
 
     // Load touch calibration from SD, or run calibration wizard
-    // Load touch calibration from SD, or run calibration wizard
+#ifdef USE_GT911_TOUCH
+    // GT911 capacitive touch is factory-calibrated — no wizard needed
+    _calibrated = true;
+    DebugSerial.println("[UI] GT911 capacitive touch — no calibration needed");
+    switchScreen(ScreenId::FileBrowser);
+#else
     if (!loadCalibration()) {
         DebugSerial.println("[UI] No calibration found — starting calibration wizard");
         switchScreen(ScreenId::Calibration);
@@ -51,6 +60,7 @@ void UIManager::begin() {
         DebugSerial.println("[UI] Touch calibration loaded from SD");
         switchScreen(ScreenId::FileBrowser);
     }
+#endif
 }
 
 void UIManager::loop() {
@@ -84,6 +94,10 @@ void UIManager::switchScreen(ScreenId id) {
     _tft.fillScreen(CLR_BG);
     _current->enter();
     _current->draw();
+#ifdef USE_LOVYANGFX
+    // Force PSRAM framebuffer cache flush so DMA displays the drawn content
+    _tft.display();
+#endif
     DebugSerial.printf("[UI] Switched to screen %d\n", idx);
 }
 
@@ -103,9 +117,12 @@ bool UIManager::getTouch(int16_t& screenX, int16_t& screenY) {
     int16_t rawX, rawY;
     if (!getRawTouch(rawX, rawY)) return false;
 
-    // Map raw touch values to screen coordinates.
-    // Axis mapping depends on display orientation vs touch panel orientation.
-#ifdef USE_LOVYANGFX
+#ifdef USE_GT911_TOUCH
+    // GT911 capacitive touch reports directly in screen pixel coordinates
+    // No calibration mapping needed
+    int32_t sx = rawX;
+    int32_t sy = rawY;
+#elif defined(USE_LOVYANGFX)
     // RGB panel (rotation=0, native landscape): raw X → screen X, raw Y → screen Y
     int32_t sx = (int32_t)(rawX - _cal.rawXMin) * SCREEN_W / (_cal.rawXMax - _cal.rawXMin);
     int32_t sy = (int32_t)(rawY - _cal.rawYMin) * SCREEN_H / (_cal.rawYMax - _cal.rawYMin);

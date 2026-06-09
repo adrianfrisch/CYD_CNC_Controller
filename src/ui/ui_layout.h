@@ -23,10 +23,10 @@ static constexpr int UI_HEADER_TEXT_Y    = UI_HEADER_H / 2;        // 12 @ 24
 static constexpr int UI_MARGIN          = SCREEN_W / 80;           // 4 @ 320
 static constexpr int UI_PADDING         = SCREEN_W / 40;           // 8 @ 320
 
-// Font size (TFT_eSPI text size multiplier)
-static constexpr int UI_FONT_SM         = 1;                       // Small text
-static constexpr int UI_FONT_MD         = (SCREEN_W >= 480) ? 2 : 1;  // Medium (scales up for large displays)
-static constexpr int UI_FONT_LG         = (SCREEN_W >= 480) ? 3 : 2;  // Large
+// Font size (text size multiplier — LovyanGFX supports float, TFT_eSPI uses int)
+static constexpr float UI_FONT_SM       = (SCREEN_W >= 800) ? 1.8f : 1.0f;  // Small text
+static constexpr float UI_FONT_MD       = (SCREEN_W >= 800) ? 2.5f : ((SCREEN_W >= 480) ? 2.0f : 1.0f);  // Medium
+static constexpr float UI_FONT_LG       = (SCREEN_W >= 800) ? 3.5f : ((SCREEN_W >= 480) ? 3.0f : 2.0f);  // Large
 
 // Text line height (pixels per text line at size 1)
 static constexpr int UI_LINE_H          = SCREEN_H / 15;           // 16 @ 240

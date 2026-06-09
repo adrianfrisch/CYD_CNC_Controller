@@ -39,20 +39,21 @@ The controller supports multiple ESP32 TFT display boards. The UI layout adapts 
 
 #### 2.1.2 Additional Supported Resolutions
 
-| Board / Display          | Resolution     | Build Flags                          |
-|--------------------------|----------------|--------------------------------------|
-| ESP32-2432S028R (CYD 2.8") | 320×240      | Default (no flags needed)            |
-| ESP32-3248S035 (CYD 3.5")  | 480×320      | `-DUI_SCREEN_W=480 -DUI_SCREEN_H=320` |
-| ESP32-8048S070 (7.0")      | 800×480      | `-DUI_SCREEN_W=800 -DUI_SCREEN_H=480` |
-| Custom                     | Any           | `-DUI_SCREEN_W=<w> -DUI_SCREEN_H=<h>` |
+| Board / Display              | Resolution | MCU       | Display Driver | Touch       | Build Environment        |
+|------------------------------|------------|-----------|----------------|-------------|--------------------------|
+| ESP32-2432S028R (CYD 2.8")   | 320×240    | ESP32     | TFT_eSPI (ILI9341 SPI) | XPT2046 resistive (SW SPI) | `esp32-2432S028R` (default) |
+| ESP32-4827S043R (4.3")        | 480×272    | ESP32-S3  | LovyanGFX (RGB parallel) | XPT2046 resistive (SW SPI) | `esp32-4827S043R` |
+| ESP32-8048S070C (7.0")        | 800×480    | ESP32-S3  | LovyanGFX (RGB parallel) | GT911 capacitive (I2C) | `esp32-8048S070C` |
+| Custom                        | Any        | ESP32/S3  | TFT_eSPI or LovyanGFX | XPT2046 or GT911 | Custom env |
 
 #### 2.1.3 Display Adaptation Strategy
 
 - All UI element positions and sizes are derived proportionally from `SCREEN_W` and `SCREEN_H` in `src/ui/ui_layout.h`
-- Font sizes scale up for displays ≥480px wide (`UI_FONT_MD`, `UI_FONT_LG`)
+- Font sizes scale: 1.0× for 320px, 2.0× for ≥480px, 1.8× for ≥800px wide displays (using float multipliers)
 - No hardcoded pixel positions exist in screen implementations — all use layout constants
-- Touch calibration is per-device and stored on SD card (`/touch_cal.dat`)
-- TFT driver configuration (pin mappings, controller IC) is set via PlatformIO build flags for TFT_eSPI
+- Touch calibration is per-device and stored on SD card (`/touch_cal.dat`); GT911 capacitive touch is factory-calibrated (no wizard needed)
+- Display driver selection: TFT_eSPI for SPI panels, LovyanGFX for RGB parallel panels (selected via `USE_LOVYANGFX` build flag)
+- GT911 touch is selected via `USE_GT911_TOUCH` build flag; XPT2046 is the default
 
 ### 2.2 CNC Controller
 

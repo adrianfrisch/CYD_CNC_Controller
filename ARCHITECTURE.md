@@ -111,9 +111,10 @@ ui_layout.h ──→ All layout constants (proportional to resolution)
 screen_*.cpp ──→ Use layout constants only, no hardcoded pixel values
 ```
 
-Supported resolutions: 320×240 (CYD 2.8"), 480×320 (CYD 3.5"), 800×480 (7"), or custom.
+Supported resolutions: 320×240 (CYD 2.8"), 480×272 (4.3"), 800×480 (7"), or custom.
 To change resolution, set `-DTFT_WIDTH=<portrait_h> -DTFT_HEIGHT=<portrait_w>` in platformio.ini.
-Font sizes auto-scale: `UI_FONT_MD`/`UI_FONT_LG` increase at ≥480px width.
+Font sizes auto-scale: `UI_FONT_SM`/`UI_FONT_MD`/`UI_FONT_LG` increase at ≥480px and ≥800px width.
+The 7" board (ESP32-8048S070C) uses LovyanGFX with an RGB parallel panel and GT911 capacitive touch (I2C).
 
 ## Screen Navigation State Machine
 

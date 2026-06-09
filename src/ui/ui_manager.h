@@ -5,7 +5,11 @@
 
 #include <Arduino.h>
 #include "display_driver.h"
-#include "xpt2046_soft.h"
+#ifdef USE_GT911_TOUCH
+  #include "gt911_touch.h"
+#else
+  #include "xpt2046_soft.h"
+#endif
 #include "config.h"
 
 // Forward declarations
@@ -72,7 +76,11 @@ public:
 
 private:
     DisplayDriver  _tft;
+#ifdef USE_GT911_TOUCH
+    GT911_Touch  _touch;
+#else
     XPT2046_Soft _touch;
+#endif
 
     static constexpr int NUM_SCREENS = (int)ScreenId::_COUNT;
     Screen*   _screens[NUM_SCREENS] = {};

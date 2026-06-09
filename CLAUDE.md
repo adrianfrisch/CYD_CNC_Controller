@@ -4,7 +4,7 @@
 
 ## What is this project?
 
-A standalone **touchscreen GCode sender** for GRBL-based CNC machines. Runs on ESP32 boards with TFT touchscreens — primarily the ESP32-2432S028R "Cheap Yellow Display" (2.8", 320×240), but supports multiple display sizes (3.5" 480×320, 7" 800×480, custom) via resolution-independent layout. Connects to an Arduino Uno running GRBL 1.1 via 3-wire UART. Users upload GCode files over WiFi, browse/preview on the touchscreen, and run CNC jobs without a PC.
+A standalone **touchscreen GCode sender** for GRBL-based CNC machines. Runs on ESP32 boards with TFT touchscreens — primarily the ESP32-2432S028R "Cheap Yellow Display" (2.8", 320×240), but supports multiple display sizes (4.3" 480×272, 7" 800×480, custom) via resolution-independent layout. Connects to an Arduino Uno running GRBL 1.1 via 3-wire UART. Users upload GCode files over WiFi, browse/preview on the touchscreen, and run CNC jobs without a PC.
 
 **Status:** Work in progress — functional for basic use but has known bugs (see README.md "Known Issues").
 
@@ -16,7 +16,7 @@ A standalone **touchscreen GCode sender** for GRBL-based CNC machines. Runs on E
 | Platform | ESP32 (Arduino framework) via PlatformIO |
 | Build | `pio run` / `pio run -t upload` |
 | Test | `pio test -e native` (Unity framework, runs on PC) |
-| Display lib | TFT_eSPI (ILI9341 320×240 landscape) |
+| Display lib | TFT_eSPI (ILI9341 SPI) or LovyanGFX (RGB parallel) |
 | Web server | ESPAsyncWebServer + AsyncTCP |
 | Target firmware | GRBL 1.1 on Arduino Uno |
 
@@ -32,7 +32,10 @@ src/web_server.h/cpp         — WiFi STA mode + async REST API for file upload/
 src/ui/ui_manager.h/cpp      — TFT display, touch input, screen management
 src/ui/ui_layout.h           — Resolution-independent layout constants (derived from SCREEN_W/H)
 src/ui/screen_*.h/cpp        — 5 screens: calibration, filebrowser, preview, job, jog
-src/ui/xpt2046_soft.h/cpp    — Custom software SPI touch driver
+src/ui/xpt2046_soft.h/cpp    — Custom software SPI touch driver (2.8"/4.3" boards)
+src/ui/gt911_touch.h/cpp     — GT911 capacitive I2C touch driver (7" board)
+src/ui/lgfx_config_8048S070.h — LovyanGFX panel config for 7" RGB parallel display
+src/ui/lgfx_config_4827S043.h — LovyanGFX panel config for 4.3" RGB parallel display
 lib/testable/                — Pure logic extracted for native testing (no hardware deps)
 test/test_*/                 — Unity test suites (114 total tests across 5 suites)
 tools/grbl_simulator.py      — Python GRBL 1.1 simulator for development
@@ -73,20 +76,25 @@ Follow these strictly when generating code:
 - **CPU:** ESP32 dual-core 240 MHz
 - **RAM:** 320 KB SRAM (no PSRAM) — ~14% used currently
 - **Flash:** 4 MB — ~29% used currently
-- **Display:** Configurable resolution (default 320×240, supports 480×320, 800×480, custom), RGB565 color, landscape orientation
-- **Touch:** Resistive XPT2046 with software SPI (calibration per-device on SD)
+- **Display:** Configurable resolution (default 320×240, supports 480×272, 800×480, custom), RGB565 color, landscape orientation
+- **Touch:** XPT2046 resistive (SW SPI) on 2.8"/4.3" boards; GT911 capacitive (I2C) on 7" board
 - **SD:** FAT32, max 32 GB, max 64 files in listing
-- **UART to GRBL:** 115200 baud via GPIO 27 (TX) / GPIO 22 (RX)
+- **UART to GRBL:** 115200 baud via GPIO 27/22 (CYD) or GPIO 43/44 (ESP32-S3 boards)
 
 ### Display Resolution Configuration
 
 Resolution is set via PlatformIO build flags (portrait dimensions — swapped to landscape in `config.h`):
 
 ```ini
-; platformio.ini example for 3.5" display (portrait: 320×480 → landscape: 480×320)
-build_flags = -DTFT_WIDTH=320 -DTFT_HEIGHT=480
+; platformio.ini example for 4.3" display (portrait: 272×480 → landscape: 480×272)
+build_flags = -DTFT_WIDTH=272 -DTFT_HEIGHT=480
+
+; 7" display (portrait: 480×800 → landscape: 800×480)
+build_flags = -DTFT_WIDTH=480 -DTFT_HEIGHT=800
 ```
 
+Three PlatformIO environments are defined: `esp32-2432S028R` (2.8" CYD), `esp32-4827S043R` (4.3"), `esp32-8048S070C` (7").
+The 7" board uses LovyanGFX (`-DUSE_LOVYANGFX=1`) with GT911 capacitive touch (`-DUSE_GT911_TOUCH=1`).
 All UI layout is proportional via `src/ui/ui_layout.h`. Never hardcode pixel positions in screen code.
 
 ## Key Interfaces

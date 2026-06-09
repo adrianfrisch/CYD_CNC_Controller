@@ -45,6 +45,7 @@ The configuration for your CYD needs to be adjusted in the platformio.ini file t
 | Item | Description |
 |------|-------------|
 | **CYD Board** | ESP32-2432S028R — ESP32 + 2.8" TFT + touchscreen + SD slot (~$10) |
+| **7" Board (alt)** | ESP32-8048S070C — ESP32-S3 + 7.0" TFT (800×480) + capacitive touch + SD (~$25) |
 | **Arduino + GRBL** | Arduino Uno R3 running GRBL 1.1 firmware |
 | **CNC Shield** | Arduino CNC Shield v3.0 (with A4988/DRV8825 stepper drivers) |
 | **Micro-SD Card** | ≤ 32 GB, formatted FAT32 |

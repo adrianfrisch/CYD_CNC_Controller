@@ -2,7 +2,7 @@
 
 ## Project Summary
 
-ESP32-based touchscreen GCode sender for GRBL 1.1 CNC machines. Supports multiple display sizes — primarily the ESP32-2432S028R "Cheap Yellow Display" (CYD) with a 2.8" ILI9341 TFT (320×240), but also 3.5" (480×320), 7" (800×480), and custom resolutions. All boards use XPT2046 resistive touch, SD card slot, and WiFi.
+ESP32-based touchscreen GCode sender for GRBL 1.1 CNC machines. Supports multiple display sizes — primarily the ESP32-2432S028R "Cheap Yellow Display" (CYD) with a 2.8" ILI9341 TFT (320×240), but also 4.3" (480×272), 7" (800×480), and custom resolutions. The 2.8" and 4.3" boards use XPT2046 resistive touch; the 7" board (ESP32-8048S070C) uses GT911 capacitive touch. All boards have SD card slot and WiFi.
 
 The CYD connects to an Arduino Uno running GRBL via 3-wire UART (TX/RX/GND). Users upload GCode files over WiFi, browse/preview them on the touchscreen, and stream jobs to the CNC — no PC required.
 
@@ -10,8 +10,8 @@ The CYD connects to an Arduino Uno running GRBL via 3-wire UART (TX/RX/GND). Use
 
 - **Platform:** ESP32 (Arduino framework) via PlatformIO
 - **Language:** C++17 (embedded subset — no STL containers, no exceptions, no RTTI)
-- **Display:** TFT_eSPI library driving ILI9341 at 320×240 landscape
-- **Touch:** Custom software SPI XPT2046 driver (`xpt2046_soft.h/cpp`)
+- **Display:** TFT_eSPI (ILI9341 SPI for 2.8") or LovyanGFX (RGB parallel for 4.3"/7")
+- **Touch:** XPT2046 resistive (SW SPI) or GT911 capacitive (I2C, 7" board)
 - **Web:** ESPAsyncWebServer + AsyncTCP for file upload REST API
 - **JSON:** ArduinoJson v7
 - **Tests:** PlatformIO Unity framework, native environment (`pio test -e native`)
@@ -103,6 +103,9 @@ src/web_server.h/cpp      — WiFi STA + async web server for uploads
 src/ui/ui_manager.h/cpp   — Display init, touch, screen switching
 src/ui/ui_layout.h        — Resolution-independent layout constants
 src/ui/screen_*.h/cpp     — Individual screen implementations
+src/ui/xpt2046_soft.h/cpp — Resistive touch driver (2.8"/4.3" boards)
+src/ui/gt911_touch.h/cpp  — Capacitive touch driver (7" board)
+src/ui/lgfx_config_*.h    — LovyanGFX panel configs (4.3", 7" boards)
 lib/testable/             — Hardware-free pure logic (for unit tests)
 test/test_*/              — Unity test suites
 tools/grbl_simulator.py   — Python GRBL simulator for testing

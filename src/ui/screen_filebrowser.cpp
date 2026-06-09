@@ -158,6 +158,9 @@ void FileBrowserScreen::update() {
     if (_needsRedraw) {
         _needsRedraw = false;
         draw();
+#ifdef USE_LOVYANGFX
+        ui.tft().display();
+#endif
     }
 
     // Auto-refresh: check SD card every 2 seconds
@@ -221,10 +224,13 @@ void FileBrowserScreen::onTouch(int16_t x, int16_t y) {
                 _needsRedraw = true;
             }
         }
+        return;
     }
 
-    // [CAL] button in status bar
+    // [CAL] button in status bar (not needed for capacitive touch)
+#ifndef USE_GT911_TOUCH
     if (x >= SCREEN_W - SCREEN_W * 60 / 320 && y >= UI_STATUS_Y) {
         ui.runCalibration();
     }
+#endif
 }
