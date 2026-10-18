@@ -103,6 +103,20 @@ int calculateProgress(size_t bytesRead, size_t fileSize);
 unsigned long calculateETA(int percentComplete, unsigned long elapsedMs);
 
 // ============================================================================
+// Jog Functions
+// ============================================================================
+
+/**
+ * Calculate one continuous-jog segment: the relative move covered in segMs
+ * at feedMmMin along a direction whose components are -1, 0 or +1.
+ * The feed applies to the vector path, so a diagonal moves each axis by
+ * distance / sqrt(axes) — same speed as a straight move.
+ * @return false (outputs zeroed) if direction is zero or feed/segMs is not positive
+ */
+bool calcJogSegment(int dirX, int dirY, int dirZ, float feedMmMin, unsigned long segMs,
+                    float& dx, float& dy, float& dz);
+
+// ============================================================================
 // WiFi Config Parsing Functions
 // ============================================================================
 

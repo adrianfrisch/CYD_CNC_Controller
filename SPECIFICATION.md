@@ -375,7 +375,8 @@ The CNC Shield v3.0 stacks directly on the Arduino Uno's pin headers. The serial
 **Z Feed rate:** Automatically calculated as XY feed ÷ 2 (configurable via `JOG_Z_FEED_DIVISOR`)  
 **Z Microstep:** Fixed 0.05 mm at 50 mm/min — intended for manually zeroing Z by touching off the workpiece  
 **Diagonal movement:** Moves the configured step distance on each axis simultaneously (e.g., step=1mm sends X1.000 Y1.000). This means the actual diagonal travel distance is step × √2, but each axis moves exactly the configured step amount. Feed rate is the same as XY feed.  
-**Jog command format:** `$J=G91 Xn.nnn Yn.nnn Zn.nnn Fnnn`
+**Jog command format:** `$J=G91 Xn.nnn Yn.nnn Zn.nnn Fnnn`  
+**Continuous jog:** Pressing an XY or Z jog button sends one step jog immediately. If the button is still held after `JOG_HOLD_MS` (500 ms), the screen streams short `$J=` segments, each covering `JOG_CONT_SEG_MS` (100 ms) of travel at the current feed (computed by `calcJogSegment()`; diagonals move at the feed along the path, i.e. each axis × 1/√2). Segments are only sent while no line awaits `ok` and less than `JOG_CONT_LEAD_MS` (300 ms) of nominal motion is queued, which bounds overrun if the UI stalls. On release, jog cancel (`0x85`) decelerates and flushes all queued jog motion. Continuous mode only starts for a press that began on a jog button of this screen (not a press carried over from a screen switch). Z microstep buttons are tap-only.
 
 ---
 

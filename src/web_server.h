@@ -12,10 +12,12 @@ public:
     String getIP() const;
     bool isRunning() const { return _running; }
     bool isConnected() const;
+    int wifiStatus() const;              // Raw wl_status_t (to detect changes)
+    const char* wifiStatusText() const;  // Short human-readable WiFi state
 
 private:
-    bool loadWiFiConfig();   // Load SSID/PASS from /wifi.cfg on SD
-    bool connectWiFi();
+    bool loadWiFiConfig();   // Load SSID/PASS from /wifi.cfg on SPIFFS
+    bool connectWiFi(bool wait);
 
     bool _running = false;
     unsigned long _lastReconnectAttempt = 0;

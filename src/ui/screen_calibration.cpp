@@ -33,7 +33,7 @@ void CalibrationScreen::draw() {
     tft.drawString("as possible.  Two points needed.", SCREEN_W / 2, 90);
     tft.setTextColor(CLR_ACCENT, CLR_BG);
     tft.drawString("Touch screen to begin...", SCREEN_W / 2, 130);
-    tft.setTextColor(CLR_BORDER, CLR_BG);
+    tft.setTextColor(CLR_TEXT_DIM, CLR_BG);
     tft.drawString("(Watching for touch input below)", SCREEN_W / 2, 160);
 
     // Live touch diagnostic — show raw values until user touches
@@ -110,7 +110,7 @@ void CalibrationScreen::draw() {
     tft.drawString("Calibration saved to SD card.", SCREEN_W / 2, 60);
 
     // Show debug info
-    tft.setTextColor(CLR_BORDER, CLR_BG);
+    tft.setTextColor(CLR_TEXT_DIM, CLR_BG);
     char buf[80];
     snprintf(buf, sizeof(buf), "Pt1 raw: (%d, %d)  Pt2 raw: (%d, %d)", raw1X, raw1Y, raw2X, raw2Y);
     tft.drawString(buf, SCREEN_W / 2, 90);

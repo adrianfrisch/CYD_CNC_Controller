@@ -144,6 +144,7 @@ struct TouchCalData {
 #define CLR_BTN_DANGER    0xF800  // Red
 #define CLR_BTN_WARN      0xFD20  // Orange
 #define CLR_BORDER        0x4A69  // Grey
+#define CLR_TEXT_DIM      0xBDF7  // Light grey (secondary text, readable on header/bg)
 #define CLR_PROGRESS      0x07E0  // Green
 #define CLR_ACCENT        0xFFE0  // Yellow
 
@@ -153,12 +154,16 @@ struct TouchCalData {
 #define GCODE_LINE_MAX    256    // Max chars per GCode line
 #define GCODE_BUFFER_LINES 16   // Lines buffered ahead
 #define GRBL_RX_BUFFER    128   // GRBL's receive buffer size
+#define GRBL_ACK_RECOVER_MS 1000 // Idle this long after last send → unacked lines were lost
 
 // -----------------------------------------------------------------------------
 // Jog feed rates (mm/min)
 // -----------------------------------------------------------------------------
 #define JOG_FEED_DEFAULT_IDX  3    // Index into feed rate array (default: 1000)
 #define JOG_Z_FEED_DIVISOR    2    // Z feed = XY feed / this value
+#define JOG_HOLD_MS         500    // Hold a jog button this long → continuous jog
+#define JOG_CONT_SEG_MS     100    // Duration of each continuous-jog segment
+#define JOG_CONT_LEAD_MS    300    // Max nominal motion queued ahead (bounds overrun)
 
 // -----------------------------------------------------------------------------
 // Job status polling

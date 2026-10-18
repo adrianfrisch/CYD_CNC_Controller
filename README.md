@@ -169,17 +169,35 @@ pio device monitor
 
 The CYD connects to your existing WiFi network for wireless file management — no SD card swapping needed.
 
-1. Set your WiFi credentials in `include/config.h`:
-   ```cpp
-   #define WIFI_SSID     "YOUR_WIFI_SSID"
-   #define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+### Configuring WiFi
+
+Credentials are read at boot from `/wifi.cfg` in the ESP32's internal flash (SPIFFS — **not** the SD card). If that file is missing, the compile-time defaults from `include/config.h` are used.
+
+**Recommended — `wifi.cfg` (no rebuild needed to change credentials):**
+
+1. Copy the template: `cp data/wifi.cfg.example data/wifi.cfg` (`data/wifi.cfg` is gitignored)
+2. Edit it (no quotes around values):
    ```
-2. Flash the firmware and power on the CYD
-3. Check the serial monitor for the assigned IP address (e.g., `192.168.1.42`)
-4. On any device on the same network, open **http://&lt;ip-address&gt;/** in a browser
-5. Drag and drop a GCode file or use the file picker
-6. The file is saved directly to the SD card
-7. Tap **RFSH** on the CYD to see the new file
+   SSID=YOUR_WIFI_SSID
+   PASS=YOUR_WIFI_PASSWORD
+   ```
+3. Upload the `data/` folder to SPIFFS for your board, e.g.:
+   ```bash
+   pio run -e esp32-8048S070C -t uploadfs
+   ```
+   This also uploads `data/machine.cfg` (see [Machine Configuration](#machine-configuration)).
+
+**Fallback — compile-time defaults:** set `WIFI_SSID` / `WIFI_PASSWORD` in `include/config.h` and reflash. Don't commit real credentials.
+
+> Only 2.4 GHz networks are supported (ESP32 limitation).
+
+### Uploading files
+
+1. Power on the CYD. The file browser's bottom status bar shows the IP address once connected (e.g., `http://192.168.1.42`). If it can't connect, it shows the reason instead (`'<ssid>' not found`, `auth failed`, …)
+2. On any device on the same network, open **http://&lt;ip-address&gt;/** in a browser
+3. Drag and drop a GCode file or use the file picker
+4. The file is saved directly to the SD card
+5. The file list on the CYD refreshes automatically within ~2 seconds
 
 > **Note:** If the WiFi connection is lost, the CYD will automatically reconnect every 30 seconds. The web server remains registered and will resume serving as soon as the connection is restored.
 
@@ -190,7 +208,7 @@ The CYD connects to your existing WiFi network for wireless file management — 
 The file `data/machine.cfg` configures machine-specific features. Upload it to the CYD's SPIFFS filesystem with:
 
 ```bash
-pio run -t uploadfs
+pio run -e <env> -t uploadfs   # e.g. -e esp32-8048S070C
 ```
 
 ### Available Settings
@@ -208,7 +226,7 @@ HOMING=no
 CLEARANCE_HEIGHT=10.0
 ```
 
-> **Tip:** After editing `data/machine.cfg`, run `pio run -t uploadfs` to flash the updated config to the CYD. The settings take effect on the next reboot.
+> **Tip:** After editing `data/machine.cfg`, run `pio run -e <env> -t uploadfs` to flash the updated config to the CYD. The settings take effect on the next reboot.
 
 ---
 
@@ -262,7 +280,8 @@ File Browser  ──OPEN──→  Preview  ──START──→  Job
 - **XY pad** — tap Y+, Y-, X-, X+ to jog in that direction; corner buttons for diagonal XY movement
 - **Diagonal** — moves the step distance on each axis simultaneously (step=1mm → X+1 Y+1, not 1mm total diagonal)
 - **Z buttons** — Z+ (up) and Z- (down) at half the XY feed rate
-- **Z microstep** — Z+.01 / Z-.01 buttons (0.01mm at 50 mm/min) for precise Z touch-off zeroing
+- **Continuous jog** — hold any XY or Z jog button for more than 0.5 s and the axis keeps moving at the current feed rate until you release it. A short tap still moves one step
+- **Z microstep** — Z+.05 / Z-.05 buttons (0.05mm at 50 mm/min) for precise Z touch-off zeroing (tap only, no continuous mode)
 - **Step size** — tap **–** / **+** to cycle through 0.1, 0.5, 1.0, 5.0, 10.0, 50.0 mm
 - **Feed rate** — tap **–** / **+** to cycle through 50, 100, 500, 1000, 2000, 3000, 5000 mm/min; Z feed is shown automatically (XY ÷ 2)
 - **SET 0** — set current position as work zero (all axes)

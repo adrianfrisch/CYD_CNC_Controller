@@ -11,10 +11,22 @@ public:
     void draw() override;
     void update() override;
     void onTouch(int16_t x, int16_t y) override;
+    void onTouchHeld(int16_t x, int16_t y, unsigned long heldMs) override;
+    void onRelease() override;
 
 private:
     void drawPosition();
     void drawStepAndFeed();
+    void stepJog(int dx, int dy, int dz, float feed);  // Tap: one step, arms hold
+    void resetHold();
+
+    // Continuous jog — a jog button held for JOG_HOLD_MS streams short
+    // segments until release, then jog-cancel (0x85) stops the machine.
+    bool  _holdArmed = false;   // Press started on a jog button of this screen
+    bool  _contActive = false;  // Continuous segments are being streamed
+    int   _holdDx = 0, _holdDy = 0, _holdDz = 0;
+    float _holdFeed = 0;
+    unsigned long _contQueuedUntil = 0; // Nominal end time of queued segments
 
     float _jogStep = 1.0f;    // mm per jog press
     float _jogFeed = 1000.0f; // XY feed mm/min

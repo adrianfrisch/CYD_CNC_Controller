@@ -34,6 +34,10 @@ public:
     virtual void draw() = 0;          // Full redraw
     virtual void update() = 0;        // Partial update (called in loop)
     virtual void onTouch(int16_t x, int16_t y) = 0;
+    // Called every loop while a press is held. The press may have started on
+    // another screen (a button that switched screens), so latch state in onTouch.
+    virtual void onTouchHeld(int16_t /*x*/, int16_t /*y*/, unsigned long /*heldMs*/) {}
+    virtual void onRelease() {}       // Finger lifted after a press
 };
 
 // Screen IDs
@@ -67,6 +71,7 @@ public:
     bool getTouch(int16_t& screenX, int16_t& screenY);
 
     // Drawing helpers
+    static void setFontSm(DisplayDriver& tft);
     static void drawButton(DisplayDriver& tft, const Button& btn);
     static void drawHeader(DisplayDriver& tft, const char* title);
     static void drawProgressBar(DisplayDriver& tft, int x, int y, int w, int h, int percent, uint16_t color);

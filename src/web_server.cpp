@@ -104,7 +104,7 @@ loadFiles();
 )rawliteral";
 
 void WebUploadServer::begin() {
-    // Load WiFi credentials from SD card, fall back to compiled defaults
+    // Load WiFi credentials from SPIFFS /wifi.cfg, fall back to compiled defaults
     if (!loadWiFiConfig()) {
         _ssid = WIFI_SSID;
         _password = WIFI_PASSWORD;
@@ -112,7 +112,7 @@ void WebUploadServer::begin() {
     }
 
     // Connect to WiFi network in station mode
-    if (connectWiFi()) {
+    if (connectWiFi(true)) {
         DebugSerial.printf("[WEB] Connected to %s  IP: %s\n", _ssid.c_str(), WiFi.localIP().toString().c_str());
     } else {
         DebugSerial.printf("[WEB] Failed to connect to %s — web upload unavailable\n", _ssid.c_str());
@@ -187,7 +187,7 @@ void WebUploadServer::loop() {
     // Reconnect WiFi if connection was lost
     if (!isConnected() && (millis() - _lastReconnectAttempt > 30000)) {
         DebugSerial.println("[WEB] WiFi disconnected, attempting reconnect...");
-        connectWiFi();
+        connectWiFi(false);  // Non-blocking — must not freeze UI/touch
     }
 }
 
@@ -238,11 +238,12 @@ bool WebUploadServer::loadWiFiConfig() {
     return true;
 }
 
-bool WebUploadServer::connectWiFi() {
+bool WebUploadServer::connectWiFi(bool wait) {
     _lastReconnectAttempt = millis();
     WiFi.mode(WIFI_STA);
     WiFi.setHostname(WIFI_HOSTNAME);
     WiFi.begin(_ssid.c_str(), _password.c_str());
+    if (!wait) return false;
 
     DebugSerial.printf("[WEB] Connecting to WiFi '%s'...", _ssid.c_str());
     unsigned long start = millis();
@@ -257,6 +258,24 @@ bool WebUploadServer::connectWiFi() {
 
 bool WebUploadServer::isConnected() const {
     return WiFi.status() == WL_CONNECTED;
+}
+
+int WebUploadServer::wifiStatus() const {
+    return (int)WiFi.status();
+}
+
+const char* WebUploadServer::wifiStatusText() const {
+    static char buf[48];
+    switch (WiFi.status()) {
+        case WL_CONNECTED:      return "WiFi OK";
+        case WL_NO_SSID_AVAIL:
+            // Show the SSID actually in use — it may come from wifi.cfg
+            snprintf(buf, sizeof(buf), "WiFi: '%s' not found", _ssid.c_str());
+            return buf;
+        case WL_CONNECT_FAILED: return "WiFi: auth failed";
+        case WL_CONNECTION_LOST: return "WiFi: connection lost";
+        default:                return "WiFi: connecting...";
+    }
 }
 
 String WebUploadServer::getIP() const {

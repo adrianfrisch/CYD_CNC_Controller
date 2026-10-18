@@ -75,8 +75,15 @@ void UIManager::loop() {
         if (_current) {
             _current->onTouch(sx, sy);
         }
+    } else if (pressed && _touched) {
+        if (_current) {
+            _current->onTouchHeld(sx, sy, millis() - _lastTouch);
+        }
     }
     if (!pressed) {
+        if (_touched && _current) {
+            _current->onRelease();
+        }
         _touched = false;
     }
 
@@ -148,6 +155,19 @@ bool UIManager::getTouch(int16_t& screenX, int16_t& screenY) {
 // Drawing Helpers
 // ---------------------------------------------------------------------------
 
+// Large panels use a smooth proportional font — scaling the 6x8 bitmap
+// font by a non-integer factor renders blocky, hard-to-read glyphs.
+// Also resets text padding; live fields set it after calling this.
+void UIManager::setFontSm(DisplayDriver& tft) {
+    tft.setTextPadding(0);
+#if defined(USE_LOVYANGFX) && (SCREEN_W >= 800)
+    tft.setFont(&fonts::DejaVu24);
+    tft.setTextSize(1);
+#else
+    UIManager::setFontSm(tft);
+#endif
+}
+
 void UIManager::drawButton(DisplayDriver& tft, const Button& btn) {
     uint16_t col = btn.enabled ? btn.color : CLR_BORDER;
     tft.fillRoundRect(btn.x, btn.y, btn.w, btn.h, 4, col);
@@ -155,7 +175,7 @@ void UIManager::drawButton(DisplayDriver& tft, const Button& btn) {
 
     tft.setTextColor(CLR_TEXT, col);
     tft.setTextDatum(MC_DATUM);
-    tft.setTextSize(UI_FONT_SM);
+    UIManager::setFontSm(tft);
     tft.drawString(btn.label, btn.x + btn.w / 2, btn.y + btn.h / 2);
 }
 
@@ -163,7 +183,7 @@ void UIManager::drawHeader(DisplayDriver& tft, const char* title) {
     tft.fillRect(0, 0, SCREEN_W, UI_HEADER_H, CLR_HEADER);
     tft.setTextColor(CLR_TEXT, CLR_HEADER);
     tft.setTextDatum(ML_DATUM);
-    tft.setTextSize(UI_FONT_SM);
+    UIManager::setFontSm(tft);
     tft.drawString(title, UI_HEADER_TEXT_X, UI_HEADER_TEXT_Y);
 }
 

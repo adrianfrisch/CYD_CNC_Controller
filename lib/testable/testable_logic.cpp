@@ -7,6 +7,7 @@
 #include "testable_logic.h"
 #include <cctype>
 #include <cstdlib>
+#include <cmath>
 
 // ============================================================================
 // String Utilities
@@ -155,6 +156,29 @@ unsigned long calculateETA(int percentComplete, unsigned long elapsedMs) {
     if (percentComplete <= 0) return 0;
     if (percentComplete >= 100) return 0;
     return (elapsedMs * (100 - percentComplete)) / percentComplete;
+}
+
+// ============================================================================
+// Jog Functions
+// ============================================================================
+
+static int clampDir(int d) { return d > 0 ? 1 : (d < 0 ? -1 : 0); }
+
+bool calcJogSegment(int dirX, int dirY, int dirZ, float feedMmMin, unsigned long segMs,
+                    float& dx, float& dy, float& dz) {
+    dx = dy = dz = 0.0f;
+    dirX = clampDir(dirX);
+    dirY = clampDir(dirY);
+    dirZ = clampDir(dirZ);
+    int axes = (dirX != 0) + (dirY != 0) + (dirZ != 0);
+    if (axes == 0 || feedMmMin <= 0.0f || segMs == 0) return false;
+
+    float dist = feedMmMin * (float)segMs / 60000.0f;
+    float perAxis = dist / sqrtf((float)axes);
+    dx = dirX * perAxis;
+    dy = dirY * perAxis;
+    dz = dirZ * perAxis;
+    return true;
 }
 
 // ============================================================================

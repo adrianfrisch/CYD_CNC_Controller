@@ -64,9 +64,12 @@ void FileBrowserScreen::draw() {
     tft.fillRect(0, UI_STATUS_Y, SCREEN_W, UI_STATUS_H, CLR_HEADER);
     tft.setTextColor(CLR_TEXT, CLR_HEADER);
     tft.setTextDatum(ML_DATUM);
-    tft.setTextSize(UI_FONT_SM);
+    UIManager::setFontSm(tft);
 
-    const char* stateStr = grbl.isConnected() ? "GRBL OK" : "NO GRBL";
+    _shownGrbl = grbl.isConnected();
+    _shownWifi = webServer.wifiStatus();
+
+    const char* stateStr = _shownGrbl ? "GRBL OK" : "NO GRBL";
     tft.drawString(stateStr, UI_MARGIN, UI_STATUS_TEXT_Y);
 
     // Show WiFi IP or SD status
@@ -76,16 +79,15 @@ void FileBrowserScreen::draw() {
         snprintf(buf, sizeof(buf), "http://%s", ip.c_str());
         tft.setTextColor(CLR_ACCENT, CLR_HEADER);
         tft.drawString(buf, SCREEN_W * 60 / 320, UI_STATUS_TEXT_Y);
-    } else if (sdCard.isReady()) {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "SD:%d files", _fileCount);
-        tft.drawString(buf, SCREEN_W * 60 / 320, UI_STATUS_TEXT_Y);
-    } else {
+    } else if (!sdCard.isReady()) {
         tft.drawString("NO SD CARD", SCREEN_W * 60 / 320, UI_STATUS_TEXT_Y);
+    } else {
+        tft.setTextColor(CLR_BTN_WARN, CLR_HEADER);
+        tft.drawString(webServer.wifiStatusText(), SCREEN_W * 60 / 320, UI_STATUS_TEXT_Y);
     }
 
     // Calibrate touch button in status bar
-    tft.setTextColor(CLR_BORDER, CLR_HEADER);
+    tft.setTextColor(CLR_TEXT_DIM, CLR_HEADER);
     tft.setTextDatum(MR_DATUM);
     tft.drawString("[CAL]", SCREEN_W - UI_MARGIN, UI_STATUS_TEXT_Y);
 
@@ -120,7 +122,7 @@ void FileBrowserScreen::drawFileList() {
         if (idx < _fileCount) {
             tft.setTextColor(CLR_TEXT, (idx == _selectedIndex) ? CLR_BTN : CLR_BG);
             tft.setTextDatum(ML_DATUM);
-            tft.setTextSize(UI_FONT_SM);
+            UIManager::setFontSm(tft);
 
             // Filename (truncated)
             char display[30];
@@ -171,6 +173,10 @@ void FileBrowserScreen::update() {
             DBG("File browser: SD contents changed, refreshing");
             _selectedIndex = -1;
             _confirmDelete = false;
+            _needsRedraw = true;
+        }
+        // WiFi connects after the first draw (webServer.begin() runs after ui.begin())
+        if (webServer.wifiStatus() != _shownWifi || grbl.isConnected() != _shownGrbl) {
             _needsRedraw = true;
         }
     }

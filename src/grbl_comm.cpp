@@ -52,6 +52,7 @@ void GrblComm::loop() {
 
     // Auto-poll status
     unsigned long now = millis();
+    recoverLostAcks(now);
     if (now - _lastStatusReq >= STATUS_POLL_MS) {
         requestStatus();
         _lastStatusReq = now;
@@ -85,6 +86,7 @@ void GrblComm::sendLine(const char* cmd) {
         _sentHead = (_sentHead + 1) % GCODE_BUFFER_LINES;
         _sentCount++;
         _grblBufFree -= len;
+        _lastSendMs = millis();
         DBG("GRBL >> %s (buf free: %d)", cmd, _grblBufFree);
     }
 #endif
@@ -197,6 +199,20 @@ void GrblComm::processIncoming() {
     }
 }
 
+void GrblComm::recoverLostAcks(unsigned long now) {
+    if (_sentCount == 0 || _status.state != GrblState::Idle) return;
+    // Need an Idle report taken well after the last send: GRBL then has
+    // parsed every line, so any count still outstanding is a lost reply.
+    if (now - _lastSendMs < GRBL_ACK_RECOVER_MS) return;
+    if ((long)(_lastStatusMs - _lastSendMs) < (long)GRBL_ACK_RECOVER_MS) return;
+
+    _lostAcks += _sentCount;
+    DBG("GRBL: recovered %d lost ack(s)", _sentCount);
+    _grblBufFree = GRBL_RX_BUFFER;
+    _sentCount = 0;
+    _sentHead = _sentTail = 0;
+}
+
 void GrblComm::parseLine(const char* line) {
     DBG("GRBL << %s", line);
 
@@ -264,6 +280,7 @@ void GrblComm::parseStatus(const char* line) {
     char* tok = strtok(p, "|");
     if (tok) {
         _status.state = parseState(tok);
+        _lastStatusMs = millis();
     }
 
     bool hasMPos = false;

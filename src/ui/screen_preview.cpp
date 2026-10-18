@@ -47,7 +47,7 @@ void PreviewScreen::draw() {
     DisplayDriver& tft = ui.tft();
     UIManager::drawHeader(tft, "GCode Preview");
 
-    tft.setTextSize(UI_FONT_SM);
+    UIManager::setFontSm(tft);
 
     // File info — size only (no slow full-file scan)
     tft.setTextColor(CLR_ACCENT, CLR_BG);
@@ -70,7 +70,7 @@ void PreviewScreen::draw() {
         tft.drawString(lineDisp, UI_MARGIN, PRV_LINES_Y + i * PRV_LINE_SPACING);
     }
     if (_hasMore) {
-        tft.setTextColor(CLR_BORDER, CLR_BG);
+        tft.setTextColor(CLR_TEXT_DIM, CLR_BG);
         tft.drawString("... more lines in file", UI_MARGIN, PRV_LINES_Y + _lineCount * PRV_LINE_SPACING);
     }
 

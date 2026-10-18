@@ -26,7 +26,7 @@ void JobScreen::draw() {
     DisplayDriver& tft = ui.tft();
     UIManager::drawHeader(tft, "Job Running");
 
-    tft.setTextSize(UI_FONT_SM);
+    UIManager::setFontSm(tft);
 
     // File name (static — only drawn once)
     tft.setTextColor(CLR_ACCENT, CLR_BG);
@@ -46,6 +46,9 @@ void JobScreen::draw() {
     UIManager::drawButton(tft, btnResume);
     UIManager::drawButton(tft, btnStop);
     UIManager::drawButton(tft, btnBack);
+
+    // GCode line band background (text is redrawn with padding, no clear)
+    tft.fillRect(0, JOB_GCODE_Y, SCREEN_W, JOB_GCODE_H, CLR_HEADER);
 
     // Force-draw all dynamic fields
     drawProgressBar();
@@ -69,7 +72,7 @@ void JobScreen::drawProgressBar() {
 
     char buf[8];
     snprintf(buf, sizeof(buf), "%d%%", pct);
-    tft.setTextSize(UI_FONT_SM);
+    UIManager::setFontSm(tft);
     tft.setTextColor(CLR_TEXT, pct > 50 ? CLR_PROGRESS : CLR_BG);
     tft.setTextDatum(MC_DATUM);
     tft.drawString(buf, JOB_PROGRESS_CX, JOB_PROGRESS_CY);
@@ -86,9 +89,10 @@ void JobScreen::drawPosition() {
     _prevZ = st.wposZ;
 
     DisplayDriver& tft = ui.tft();
-    tft.setTextSize(UI_FONT_SM);
+    UIManager::setFontSm(tft);
     tft.setTextColor(CLR_TEXT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
+    tft.setTextPadding(JOB_PROGRESS_W);
 
     char buf[48];
     snprintf(buf, sizeof(buf), "X:%7.2f  Y:%7.2f  Z:%7.2f  ", st.wposX, st.wposY, st.wposZ);
@@ -108,9 +112,10 @@ void JobScreen::drawState() {
     if (ji < 0 || ji > 4) ji = 0;
 
     DisplayDriver& tft = ui.tft();
-    tft.setTextSize(UI_FONT_SM);
+    UIManager::setFontSm(tft);
     tft.setTextColor(CLR_TEXT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
+    tft.setTextPadding(JOB_PROGRESS_W);
 
     char buf[48];
     snprintf(buf, sizeof(buf), "GRBL: %-6s  Job: %-8s  ", stateNames[si], jobStates[ji]);
@@ -124,9 +129,10 @@ void JobScreen::drawFeedSpindle() {
     _prevSpindle = st.spindleSpeed;
 
     DisplayDriver& tft = ui.tft();
-    tft.setTextSize(UI_FONT_SM);
+    UIManager::setFontSm(tft);
     tft.setTextColor(CLR_TEXT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
+    tft.setTextPadding(JOB_PROGRESS_W);
 
     char buf[48];
     snprintf(buf, sizeof(buf), "Feed: %d mm/min  Spindle: %d RPM   ", st.feedRate, st.spindleSpeed);
@@ -139,9 +145,10 @@ void JobScreen::drawLine() {
     _prevLine = line;
 
     DisplayDriver& tft = ui.tft();
-    tft.setTextSize(UI_FONT_SM);
+    UIManager::setFontSm(tft);
     tft.setTextColor(CLR_TEXT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
+    tft.setTextPadding(JOB_PROGRESS_W);
 
     char buf[32];
     snprintf(buf, sizeof(buf), "Line: %d     ", line);
@@ -156,9 +163,10 @@ void JobScreen::drawTime() {
     _prevRemaining = remaining;
 
     DisplayDriver& tft = ui.tft();
-    tft.setTextSize(UI_FONT_SM);
+    UIManager::setFontSm(tft);
     tft.setTextColor(CLR_TEXT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
+    tft.setTextPadding(JOB_PROGRESS_W);
 
     char buf[48];
     snprintf(buf, sizeof(buf), "Elapsed: %02lu:%02lu  ETA: %02lu:%02lu   ",
@@ -173,10 +181,10 @@ void JobScreen::drawGCodeLine() {
     strncpy(_prevGCode, buf, sizeof(_prevGCode) - 1);
 
     DisplayDriver& tft = ui.tft();
-    tft.fillRect(0, JOB_GCODE_Y, SCREEN_W, JOB_GCODE_H, CLR_HEADER);
-    tft.setTextSize(UI_FONT_SM);
+    UIManager::setFontSm(tft);
     tft.setTextColor(CLR_ACCENT, CLR_HEADER);
     tft.setTextDatum(ML_DATUM);
+    tft.setTextPadding(SCREEN_W - UI_MARGIN);
     tft.drawString(buf, UI_MARGIN, JOB_GCODE_TEXT_Y);
 }
 

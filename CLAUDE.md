@@ -37,7 +37,7 @@ src/ui/gt911_touch.h/cpp     — GT911 capacitive I2C touch driver (7" board)
 src/ui/lgfx_config_8048S070.h — LovyanGFX panel config for 7" RGB parallel display
 src/ui/lgfx_config_4827S043.h — LovyanGFX panel config for 4.3" RGB parallel display
 lib/testable/                — Pure logic extracted for native testing (no hardware deps)
-test/test_*/                 — Unity test suites (114 total tests across 5 suites)
+test/test_*/                 — Unity test suites (153 total tests across 7 suites)
 tools/grbl_simulator.py      — Python GRBL 1.1 simulator for development
 tools/run_integration_tests.py — Integration test runner
 data/wifi.cfg.example        — WiFi config file template
@@ -128,12 +128,12 @@ Screens: `ScreenCalibration`, `ScreenFileBrowser`, `ScreenPreview`, `ScreenJob`,
 ## Testing
 
 ```bash
-pio test -e native                  # All 114 unit tests
+pio test -e native                  # All 153 unit tests
 pio test -e native -f test_grbl_parser  # Just GRBL parser tests
 pio test -e native -v               # Verbose output
 ```
 
-Test suites: `test_grbl_parser` (20), `test_gcode` (17), `test_sd_filter` (34), `test_progress` (20), `test_wifi_config` (23)
+Test suites: `test_grbl_parser` (20), `test_gcode` (17), `test_sd_filter` (34), `test_progress` (20), `test_wifi_config` (23), `test_machine_config` (28), `test_jog` (11)
 
 When adding testable logic:
 1. Add declaration to `lib/testable/testable_logic.h`

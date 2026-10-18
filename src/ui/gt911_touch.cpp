@@ -71,9 +71,20 @@ bool GT911_Touch::readTouch(uint16_t& x, uint16_t& y) {
     uint8_t touches = status & 0x0F;
     bool bufReady = (status & 0x80) != 0;
 
-    if (!bufReady || touches == 0) {
-        // Clear status register
-        if (bufReady) writeReg(GT911_REG_STATUS, 0);
+    if (!bufReady) {
+        // No new report yet — keep the previous state instead of reporting
+        // a release, which would turn one press into several taps.
+        // Fail safe to "released" if the controller stops reporting.
+        if (_pressed && millis() - _lastReportMs > GT911_STALE_MS) _pressed = false;
+        x = _lastX;
+        y = _lastY;
+        return _pressed;
+    }
+    _lastReportMs = millis();
+
+    if (touches == 0) {
+        writeReg(GT911_REG_STATUS, 0);
+        _pressed = false;
         return false;
     }
 
@@ -85,12 +96,19 @@ bool GT911_Touch::readTouch(uint16_t& x, uint16_t& y) {
     // Clear status
     writeReg(GT911_REG_STATUS, 0);
 
-    // Validate we actually got the data
-    if (bytesRead < 4) return false;
+    // Validate we actually got the data — keep previous state otherwise
+    if (bytesRead < 4) {
+        x = _lastX;
+        y = _lastY;
+        return _pressed;
+    }
 
     // X = buf[0] (low) | buf[1] (high), Y = buf[2] (low) | buf[3] (high)
-    x = (uint16_t)buf[0] | ((uint16_t)buf[1] << 8);
-    y = (uint16_t)buf[2] | ((uint16_t)buf[3] << 8);
+    _lastX = (uint16_t)buf[0] | ((uint16_t)buf[1] << 8);
+    _lastY = (uint16_t)buf[2] | ((uint16_t)buf[3] << 8);
+    _pressed = true;
+    x = _lastX;
+    y = _lastY;
 
     return true;
 }

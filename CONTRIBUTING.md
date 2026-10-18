@@ -68,7 +68,7 @@ void MyModule::loop() { /* ... */ }
 ### Arduino/ESP32 Patterns
 - Use `millis()` for timing — never `delay()` in `loop()`
 - Debug logging via `DBG()` macro (only active when `DEVELOP_MODE=1`)
-- WiFi credentials loaded from SD card (`/wifi.cfg`), compile-time fallback in `config.h`
+- WiFi credentials loaded from SPIFFS (`/wifi.cfg`, uploaded via `pio run -e <env> -t uploadfs`), compile-time fallback in `config.h`
 
 ## Testing
 

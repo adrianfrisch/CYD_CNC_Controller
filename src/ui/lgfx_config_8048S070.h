@@ -46,7 +46,9 @@ public:
             cfg.pin_hsync   = GPIO_NUM_39;  // HSYNC
             cfg.pin_pclk    = GPIO_NUM_42;  // PCLK
 
-            cfg.freq_write = 16000000;  // Pixel clock (16MHz)
+            // Pixel clock. 16MHz starved the PSRAM framebuffer DMA during
+            // heavy redraws (image "jumps"); 14MHz still gives ~30Hz refresh.
+            cfg.freq_write = 14000000;
 
             cfg.hsync_polarity    = 0;
             cfg.hsync_front_porch = 40;

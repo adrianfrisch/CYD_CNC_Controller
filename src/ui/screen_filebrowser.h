@@ -31,5 +31,9 @@ private:
     // Auto-refresh: check SD every 2 seconds
     unsigned long _lastCheck = 0;
     int _fingerprint = 0;  // simple hash of file count + sizes to detect changes
+
+    // Connection state shown in the status bar at last draw (redraw on change)
+    int _shownWifi = -1;   // wl_status_t
+    bool _shownGrbl = false;
 };
 

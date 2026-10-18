@@ -11,6 +11,7 @@ constexpr float JogScreen::STEPS[];
 constexpr float JogScreen::FEEDS[];
 
 void JogScreen::enter() {
+    resetHold();
     _lastUpdate = 0;
     _prevX = _prevY = _prevZ = -9999;
     _prevState = -1;
@@ -20,7 +21,7 @@ void JogScreen::draw() {
     DisplayDriver& tft = ui.tft();
     // No header on jog screen — maximise space for controls
 
-    tft.setTextSize(UI_FONT_SM);
+    UIManager::setFontSm(tft);
 
     // --- XY Jog Pad (left side) ---
     int padX = JOG_PAD_X, padY = JOG_PAD_Y;
@@ -69,7 +70,7 @@ void JogScreen::draw() {
     UIManager::drawButton(tft, btnZuM);
 
     // Microstep label
-    tft.setTextColor(CLR_BORDER, CLR_BG);
+    tft.setTextColor(CLR_TEXT_DIM, CLR_BG);
     tft.setTextDatum(MC_DATUM);
     tft.drawString("probe", zmx + JOG_ZM_W / 2, padY + bh + gap + bh / 2);
 
@@ -94,7 +95,7 @@ void JogScreen::draw() {
 
 void JogScreen::drawStepAndFeed() {
     DisplayDriver& tft = ui.tft();
-    tft.setTextSize(UI_FONT_SM);
+    UIManager::setFontSm(tft);
 
     // --- Step size row ---
     int stepY = JOG_STEP_Y;
@@ -127,7 +128,7 @@ void JogScreen::drawStepAndFeed() {
     UIManager::drawButton(tft, btnFeedUp);
 
     // Label
-    tft.setTextColor(CLR_BORDER, CLR_BG);
+    tft.setTextColor(CLR_TEXT_DIM, CLR_BG);
     tft.setTextDatum(ML_DATUM);
     tft.drawString("mm/min", JOG_FEED_LABEL_X, feedY);
 }
@@ -149,7 +150,7 @@ void JogScreen::drawPosition() {
 
     DisplayDriver& tft = ui.tft();
 
-    tft.setTextSize(UI_FONT_SM);
+    UIManager::setFontSm(tft);
     tft.setTextColor(CLR_TEXT, CLR_BG);
     tft.setTextDatum(ML_DATUM);
 
@@ -162,7 +163,7 @@ void JogScreen::drawPosition() {
     snprintf(buf, sizeof(buf), "X:%7.2f Y:%7.2f Z:%7.2f [%s]  ",
              st.wposX, st.wposY, st.wposZ, stateNames[si]);
 
-    tft.fillRect(0, posY, SCREEN_W, JOG_POS_H, CLR_BG);
+    tft.setTextPadding(SCREEN_W - 2 * UI_MARGIN);
     tft.drawString(buf, UI_MARGIN, posY + JOG_POS_H / 2);
 }
 
@@ -174,48 +175,49 @@ void JogScreen::update() {
 }
 
 void JogScreen::onTouch(int16_t x, int16_t y) {
+    resetHold(); // Only a jog button press below re-arms continuous mode
     int padX = JOG_PAD_X, padY = JOG_PAD_Y;
     int bw = JOG_BTN_W, bh = JOG_BTN_H, gap = JOG_GAP;
 
     // --- XY pad ---
     // Diagonal: X-Y+ (top-left corner)
     if (x >= padX && x < padX + bw && y >= padY && y < padY + bh) {
-        grbl.jog(-_jogStep, _jogStep, 0, _jogFeed);
+        stepJog(-1, 1, 0, _jogFeed);
         return;
     }
     // Diagonal: X+Y+ (top-right corner)
     if (x >= padX + 2 * (bw + gap) && x < padX + 3 * bw + 2 * gap && y >= padY && y < padY + bh) {
-        grbl.jog(_jogStep, _jogStep, 0, _jogFeed);
+        stepJog(1, 1, 0, _jogFeed);
         return;
     }
     // Y+
     if (x >= padX + bw + gap && x < padX + 2 * bw + gap && y >= padY && y < padY + bh) {
-        grbl.jog(0, _jogStep, 0, _jogFeed);
+        stepJog(0, 1, 0, _jogFeed);
         return;
     }
     // X-
     if (x >= padX && x < padX + bw && y >= padY + bh + gap && y < padY + 2 * bh + gap) {
-        grbl.jog(-_jogStep, 0, 0, _jogFeed);
+        stepJog(-1, 0, 0, _jogFeed);
         return;
     }
     // X+
     if (x >= padX + 2 * (bw + gap) && x < padX + 3 * bw + 2 * gap && y >= padY + bh + gap && y < padY + 2 * bh + gap) {
-        grbl.jog(_jogStep, 0, 0, _jogFeed);
+        stepJog(1, 0, 0, _jogFeed);
         return;
     }
     // Diagonal: X-Y- (bottom-left corner)
     if (x >= padX && x < padX + bw && y >= padY + 2 * (bh + gap) && y < padY + 3 * bh + 2 * gap) {
-        grbl.jog(-_jogStep, -_jogStep, 0, _jogFeed);
+        stepJog(-1, -1, 0, _jogFeed);
         return;
     }
     // Diagonal: X+Y- (bottom-right corner)
     if (x >= padX + 2 * (bw + gap) && x < padX + 3 * bw + 2 * gap && y >= padY + 2 * (bh + gap) && y < padY + 3 * bh + 2 * gap) {
-        grbl.jog(_jogStep, -_jogStep, 0, _jogFeed);
+        stepJog(1, -1, 0, _jogFeed);
         return;
     }
     // Y-
     if (x >= padX + bw + gap && x < padX + 2 * bw + gap && y >= padY + 2 * (bh + gap) && y < padY + 3 * bh + 2 * gap) {
-        grbl.jog(0, -_jogStep, 0, _jogFeed);
+        stepJog(0, -1, 0, _jogFeed);
         return;
     }
 
@@ -223,11 +225,11 @@ void JogScreen::onTouch(int16_t x, int16_t y) {
     int zx = JOG_Z_X;
     if (x >= zx && x < zx + JOG_Z_W) {
         if (y >= padY && y < padY + bh) {
-            grbl.jog(0, 0, _jogStep, zFeed());
+            stepJog(0, 0, 1, zFeed());
             return;
         }
         if (y >= padY + bh + gap + bh + gap && y < padY + 2 * bh + 2 * gap + bh) {
-            grbl.jog(0, 0, -_jogStep, zFeed());
+            stepJog(0, 0, -1, zFeed());
             return;
         }
     }
@@ -299,3 +301,48 @@ void JogScreen::onTouch(int16_t x, int16_t y) {
     }
 }
 
+// =============================================================================
+// Continuous jog
+// =============================================================================
+
+void JogScreen::stepJog(int dx, int dy, int dz, float feed) {
+    grbl.jog(dx * _jogStep, dy * _jogStep, dz * _jogStep, feed);
+    _holdArmed = true;
+    _holdDx = dx;
+    _holdDy = dy;
+    _holdDz = dz;
+    _holdFeed = feed;
+}
+
+void JogScreen::resetHold() {
+    _holdArmed = false;
+    _contActive = false;
+}
+
+void JogScreen::onTouchHeld(int16_t /*x*/, int16_t /*y*/, unsigned long heldMs) {
+    if (!_holdArmed || heldMs < JOG_HOLD_MS) return;
+
+    unsigned long now = millis();
+    if (!_contActive) {
+        _contActive = true;
+        _contQueuedUntil = now;
+    }
+    if ((long)(_contQueuedUntil - now) < 0) _contQueuedUntil = now;
+
+    // Keep only ~JOG_CONT_LEAD_MS of motion queued, one line in flight at a
+    // time: if the UI stalls or the release is missed, overrun stays short.
+    if (_contQueuedUntil - now >= JOG_CONT_LEAD_MS) return;
+    if (grbl.pendingLines() > 0) return;
+
+    float dx, dy, dz;
+    if (!calcJogSegment(_holdDx, _holdDy, _holdDz, _holdFeed, JOG_CONT_SEG_MS, dx, dy, dz)) return;
+    grbl.jog(dx, dy, dz, _holdFeed);
+    _contQueuedUntil += JOG_CONT_SEG_MS;
+}
+
+void JogScreen::onRelease() {
+    if (_contActive) {
+        grbl.jogCancel(); // Decelerate and flush remaining jog segments
+    }
+    resetHold();
+}

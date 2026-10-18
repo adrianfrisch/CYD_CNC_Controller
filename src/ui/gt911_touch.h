@@ -20,6 +20,8 @@
 #define GT911_REG_X_RES   0x8048
 #define GT911_REG_Y_RES   0x804A
 
+#define GT911_STALE_MS    100     // No report for this long while pressed → released
+
 #ifndef GT911_SDA_PIN
   #define GT911_SDA_PIN   19
 #endif
@@ -44,6 +46,13 @@ private:
     uint16_t _maxY = 480;
     uint16_t _nativeX = 800;  // GT911 firmware-configured resolution
     uint16_t _nativeY = 480;
+
+    // Last reported touch state — GT911 only flags new data at its report
+    // rate (~10ms), so between reports the previous state still applies.
+    bool _pressed = false;
+    uint16_t _lastX = 0;
+    uint16_t _lastY = 0;
+    unsigned long _lastReportMs = 0;
 
     void reset();
     bool readTouch(uint16_t& x, uint16_t& y);
