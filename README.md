@@ -116,7 +116,59 @@ The CNC Shield sits on top of the Arduino Uno, but the serial pins **D0** and **
 
 > **⚠ Flashing:** Disconnect the TX/RX wires (Yellow + Green) when uploading firmware to the Arduino via USB — they share the same UART.
 
-> **Note:** No logic-level shifter is needed. ESP32 3.3V output exceeds the ATmega328P's logic-high threshold.
+> **Logic levels:** ESP32 → Uno (3.3 V into a 5 V input) works in practice, though the ESP32's guaranteed minimum high level is below the ATmega328P's worst-case threshold. Uno → ESP32 drives **5 V into a 3.3 V pin** (ESP32 GPIOs are rated 3.6 V max), so add a voltage divider on the Uno TX line — see [Recommended: voltage divider](#recommended-voltage-divider-on-uno-tx).
+
+### 7" Board (ESP32-8048S070C) Wiring
+
+On the 7" board GRBL uses the 4-pin **P1 "UART" connector** (JST 1.25 mm):
+
+| P1 pin | Signal | Connect to (Arduino Uno) |
+|--------|--------|--------------------------|
+| 1 | VIN (5 V in) | **Not connected** — the Uno cannot supply the display's current (see below) |
+| 2 | ESP TX (GPIO 43) | **D0** (RX) |
+| 3 | ESP RX (GPIO 44) | **D1** (TX) — through the voltage divider |
+| 4 | GND | **GND** |
+
+#### Longer cables: use twisted pairs (e.g. CAT5)
+
+For anything longer than a few jumper wires, run each signal in its **own twisted pair together with a ground wire**. Never put TX and RX in the same pair — they couple into each other and the return current takes a separate wire, forming a large noise-pickup loop.
+
+```
+Display P1                         CAT5                        Arduino Uno
+──────────                                                     ───────────
+pin 2  ESP TX ──────── pair A, wire 1 ──────────────────────── D0  (RX)
+pin 4  GND ─────┬───── pair A, wire 2 ──────────────────┬───── GND
+                └───── pair B, wire 2 ──────────────────┘
+pin 3  ESP RX ──────── pair B, wire 1 ──[divider]───────────── D1  (TX)
+pin 1  VIN     (not connected)
+```
+
+- TX ↔ RX are crossed: each side's TX goes to the other side's RX.
+- The ground wire of **both** pairs connects to GND at **both** ends. Spare pairs can be added as extra GND wires (both ends) or left unused.
+- Shielded cable (FTP/STP): connect the shield/drain wire at **one end only**, on the Arduino/CNC side. Standard CAT5 is unshielded (UTP).
+- Route the cable away from stepper motor wires; don't run it in parallel with them.
+
+#### Recommended: voltage divider on Uno TX
+
+Place it at the display end of the Uno TX → ESP RX line to bring the Uno's 5 V down to ~3.3 V:
+
+```
+Uno TX (pair B, wire 1) ──[ 1 kΩ ]──┬──── P1 pin 3 (ESP RX)
+                                     │
+                                  [ 2 kΩ ]
+                                     │
+                                    GND (P1 pin 4)
+```
+
+The ESP TX → Uno RX direction needs nothing. The same divider applies to the 2.8" CYD (GPIO 22).
+
+#### Known limitation: GPIO 44 is shared with the USB-serial chip
+
+The board's on-board CH340 USB-serial chip drives GPIO 44 directly — the same line the Uno's TX drives. This is why firmware upload fails while the Arduino is connected (**disconnect P1 before flashing**), and it can corrupt GRBL → display data even with perfect wiring. The firmware recovers from lost GRBL replies automatically, but if they persist, test with the display's USB cable unplugged and the board powered from a separate 5 V supply into P1 pin 1 (and nothing else on pin 1). If that fixes it, the USB chip is the cause, not the cable.
+
+#### Powering the 7" board
+
+Power it from its own 5 V supply of **at least 1 A** (USB, or a 5 V buck converter from the CNC PSU into P1 pin 1) — not from the Arduino. The backlight alone draws ~270 mA at 5 V and the whole board an estimated ~350 mA typical / 550–730 mA peak with WiFi, more than a USB-powered Uno (500 mA total) or its on-board regulator can deliver. Details and sources: [docs/research/power-esp32-from-arduino-uart.md](docs/research/power-esp32-from-arduino-uart.md).
 
 ### Power
 
