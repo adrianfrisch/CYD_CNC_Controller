@@ -1,13 +1,22 @@
 #!/usr/bin/env python3
 """
-Parametric two-part enclosure for the Sunton / Jingcai ESP32-8048S070C
-(7" 800x480 RGB TFT, GT911 capacitive touch, ESP32-S3-WROOM-1).
+Parametric two-part enclosure for the ESP32 display boards supported by the
+CYD CNC Controller firmware.  Board dimensions live in boards/<board>.py
+(each value with its source or "EST"); this file holds the design and the
+builder shared by all boards.
+
+Boards (output folder = PlatformIO environment name)
+  esp32-8048S070C   7"   800x480, GT911 capacitive touch
+  esp32-4827S043R   4.3" 480x272, XPT2046 resistive touch
+  esp32-2432S028R   2.8" 320x240 "Cheap Yellow Display", resistive touch
 
 Parts
-  * front bezel  - frames the display, 2 mm lip over the glass edge,
+  * front bezel  - frames the display, lip over the glass edge,
                    M3 heat-set inserts in four corner bosses
   * back shell   - houses the board on four corner standoffs, connector
-                   cut-outs, vents, button holes, two keyhole slots
+                   cut-outs, vents, button holes, two keyhole slots, and the
+                   GRBL cable channel + clamp tongue
+  * cable clamp  - screw-down bar that pinches the CAT5 cable on the tongue
 
 The same four M3 screws (inserted from the back) pass through the shell
 standoffs, through the PCB mounting holes, into the inserts in the bezel:
@@ -15,45 +24,31 @@ they clamp the PCB between the standoffs and the bezel bosses and hold the
 two halves together.
 
 Run (CadQuery 2.x):
-    python enclosure.py            # build, export STEP/STL, check, render PNGs
-    python enclosure.py --no-png   # skip the matplotlib previews
+    python enclosure.py                    # all boards
+    python enclosure.py esp32-2432S028R    # one board
+    python enclosure.py --no-png ...       # skip the matplotlib previews
 
-COORDINATE SYSTEM (all values in mm)
-  Seen from the FRONT (looking at the screen, landscape, touch-FPC notch at
-  the bottom edge, USB-C on the left edge):
-    X = 0 .. 181   PCB left edge -> right edge
-    Y = 0 .. 108   PCB bottom edge -> top edge
-    Z = 0          PCB front face (the face the LCD is stuck to)
-    +Z             towards the viewer;  PCB back face is at Z = -PCB_T
-  The vendor's "back" pictures are mirrored left/right with respect to this
-  frame (x_front = 181 - x_back).
+COORDINATE SYSTEM (all values in mm), per board
+  Seen from the FRONT (looking at the screen, landscape as the firmware
+  draws it):
+    X = 0 .. PCB_W   PCB left edge -> right edge
+    Y = 0 .. PCB_H   PCB bottom edge -> top edge
+    Z = 0            PCB front face (the face the LCD is stuck to)
+    +Z               towards the viewer;  PCB back face is at Z = -PCB_T
+  Edge connectors are given per edge ("left", "right", "top", "bottom") with
+  their centre position along that edge.
 
-SOURCES (download into ./reference/ — not committed, see README.md)
-  [DIM]  esp32-8048S070-back.png (identical to the vendor package file
-         3-Structure_Diagram/Dimensions.png)
-         Vendor dimensioned PCB drawing (front side, LCD outline drawn).
-         Printed dims: 181.0, 108.0, 165.0, 100.0, 3.5, 3.5, R1.6.
-         Scale derived from the printed 181.0/108.0: 6.80 px/mm (both axes
-         agree to 0.2 %).  Values marked "meas. [DIM]" are measured on that
-         drawing at that scale (about +/-0.3 mm).
-  [SPEC] vendor-ESP32-8048S070-Specifications-EN.pdf (Jingcai), p.4 table
-         (module 181.0 x 108.0, active area 153.84 x 85.63) and p.5
-         "Interface Description" back-side render
-         (= vendor-spec-p5-interface-back.png).  Positions marked
-         "meas. [SPEC p5]" are measured on that 800x800 render, scale from
-         the board outline = 181 mm (3.04 px/mm, about +/-1 mm).
-  [LCD]  JC8048B070N.pdf (LCD panel approval sheet), p.3 table and p.4
-         mechanical drawing: 164.9 x 100 x 3.5 module, AA 154.08 x 85.92,
-         bezel open 156.55 x 89.5, offsets 6.87 / 5.5 / 80.94 / 47.73.
-  [SCH]  ESP32-8048S070-LCM-V1.1.png / -MCU-V1.1.png (vendor schematics):
-         RST/BOOT are "SW_3X6X4.3" tact switches, P1 = HC-1.25-4PWT,
-         USB1 = Type-C, TF1 = push-push micro-SD, P6 = JST 1.25 2P speaker.
-  [TT]   tinytronics-8048S070C-*.jpg (retailer listing): 181 x 108 mm,
-         mounting holes 3.2 mm, USB-C.
-  [PH]   dkm1978-IMG_*.jpg real photos of a board (front and back).
-  "EST"  = estimated, not available from any primary drawing -> measure!
+CABLE ROUTES (CABLE in the board file)
+  "side"     the connector faces the left/right wall; the cable turns into a
+             groove along the outside of that wall and runs towards the
+             top/bottom edge ("run"), where a tongue past the corner holds
+             the clamp.
+  "straight" the connector faces the top/bottom wall; the cable goes straight
+             out into a wide pocket (takes the pigtail from any connector
+             behind the opening) and then through the clamp on a tongue.
 """
 
+import importlib
 import math
 import os
 import sys
@@ -61,104 +56,16 @@ import sys
 import cadquery as cq
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+OUT = HERE              # set per board in main()
 
-# =============================================================================
-# BOARD DIMENSIONS
-# =============================================================================
-PCB_W = 181.0           # [DIM] printed 181.0; [SPEC p4] 181.0; [TT] 181
-PCB_H = 108.0           # [DIM] printed 108.0; [SPEC p4] 108.0; [TT] 108
-PCB_T = 1.6             # EST: standard FR4 thickness, not documented
-PCB_CORNER_R = 3.0      # EST/meas. [DIM]: corner arc ends ~3.2 mm from edge
-
-HOLE_D = 3.2            # [DIM] printed R1.6; [TT] "mounting holes 3.2 mm"
-HOLE_INSET = 3.5        # [DIM] printed 3.5 from left & bottom edge;
-                        # meas. [DIM] all four centres 3.5-3.7 from edges
-HOLES = [(HOLE_INSET, HOLE_INSET), (PCB_W - HOLE_INSET, HOLE_INSET),
-         (HOLE_INSET, PCB_H - HOLE_INSET), (PCB_W - HOLE_INSET, PCB_H - HOLE_INSET)]
-
-# PCB notch at the right edge (front view) for the ESP32-S3 antenna
-ANT_NOTCH_X0 = 174.2    # meas. [DIM] (notch depth 6.8 mm)
-ANT_NOTCH_Y0 = 44.6     # meas. [DIM] (y_top 44.6..63.4 -> symmetric)
-ANT_NOTCH_Y1 = 63.4     # meas. [DIM]
-# Shallow notch in the bottom edge where the touch-panel FPC wraps around
-TOUCH_FPC_X0 = 138.5    # meas. [DIM]
-TOUCH_FPC_X1 = 166.5    # meas. [DIM]
-
-# ---- LCD panel (front side of the PCB) --------------------------------------
-LCD_W = 164.9           # [LCD] p.3/p.4 "164.9 +/-0.2"; [DIM] printed 165.0
-LCD_H = 100.0           # [LCD] p.3/p.4; [DIM] printed 100.0
-LCD_T = 3.5             # [LCD] p.3/p.4 "3.5 +/-0.2"
-LCD_X0 = (PCB_W - LCD_W) / 2  # meas. [DIM] 7.9 left / 8.4 right -> centred
-LCD_Y0 = (PCB_H - LCD_H) / 2  # meas. [DIM] 3.9 bottom / 4.1 top -> centred
-LCD_TAPE = 0.2          # EST: adhesive between PCB and LCD back
-
-# Active area (inside the LCD outline).  [LCD] p.4: AA 154.08 x 85.92;
-# AA left margin 80.94-154.08/2 = 3.90, right 6.87; top 47.73-85.92/2 = 4.77,
-# bottom (FPC side) 9.31.  The drawing could be a back view, so the
-# horizontal margins may be swapped -- the window below is valid either way.
-AA_W = 154.08           # [LCD] p.3/p.4 ([SPEC p4] says 153.84 x 85.63)
-AA_H = 85.92            # [LCD]
-AA_MIN_MARGIN_X = 3.90  # [LCD] derived (smaller of 3.90 / 6.87..6.92)
-AA_MIN_MARGIN_Y = 4.77  # [LCD] derived (smaller of 4.77 / 9.31)
-AA_X0 = LCD_X0 + 3.90   # [LCD] assuming the drawing is a front view
-AA_Y0 = LCD_Y0 + 9.31   # [LCD] FPC (wide border) side at the bottom
-
-# ---- capacitive touch cover glass --------------------------------------------
-GLASS_W = LCD_W         # EST: photos [TT]/[PH] show glass ~= LCD outline
-GLASS_H = LCD_H         # EST
-GLASS_T = 1.8           # EST: typical 7" GT911 CTP (1.1 glass + sensor/OCA)
-GLASS_X0 = LCD_X0
-GLASS_Y0 = LCD_Y0
-Z_LCD0 = LCD_TAPE
-Z_GLASS0 = Z_LCD0 + LCD_T
-Z_GLASS_TOP = Z_GLASS0 + GLASS_T          # = 5.5 with the defaults
-
-# ---- back-side components -----------------------------------------------------
-BACK_MAX_H = 4.3        # [SCH] tallest part = SW_3X6X4.3 tact switches
-SMD_ENVELOPE_H = 2.5    # EST: everything else (ICs, caps, FPC conns, inductors)
-
-# USB-C receptacle, left edge (front view), opening faces -X
-USB_YC = PCB_H - 54.1   # meas. [DIM] shell-leg pads at y_top 49.7/58.5;
-                        # agrees with meas. [SPEC p5] (54.1)
-USB_W, USB_H, USB_D = 8.94, 3.26, 7.35   # EST: generic 16P top-mount USB-C
-USB_OVERHANG = 0.5      # EST: receptacle lip beyond PCB edge
-USB_PLUG_W, USB_PLUG_H = 12.0, 6.5       # EST: typical USB-C plug overmould
-
-# P1 UART/power JST 1.25 mm 4-pin (HC-1.25-4PWT, horizontal), left edge
-P1_YC = PCB_H - 38.8    # meas. [SPEC p5] (+/-1 mm)
-P1_W, P1_H, P1_D = 8.3, 3.4, 5.5        # EST: 1.25 mm 4P right-angle header
-P1_PLUG_W, P1_PLUG_H = 6.8, 3.4          # EST: 4P 1.25 mm plug housing
-
-# micro-SD push-push socket on the top edge, card inserted towards -Y
-SD_XC = 129.3           # meas. [DIM] socket mouth x 123.8..134.7
-SD_OVERHANG = 1.6       # meas. [DIM] socket protrudes 1.6 beyond top edge
-SD_W, SD_D, SD_H = 14.0, 15.0, 1.85      # EST: generic push-push socket
-SD_CARD_W, SD_CARD_T = 11.0, 1.0         # micro-SD spec 11 x 15 x 1.0 max
-
-# Other top-edge connectors (front-view x of the connector centre)
-TOP_CONNECTORS = {      # meas. [SPEC p5], +/-1 mm
-    "P2_SPI_JST1.25": 103.9,
-    "P3_UART1_JST1.25": 83.3,
-    "P4_IO_JST1.25": 63.2,
-    "P5_SH1.0": 45.4,
-    "P6_SPEAKER_JST1.25_2P": 30.4,
+BOARDS = {
+    "esp32-8048S070C": "esp32_8048s070c",
+    "esp32-4827S043R": "esp32_4827s043r",
+    "esp32-2432S028R": "esp32_2432s028r",
 }
-TOP_CONN_W, TOP_CONN_H, TOP_CONN_D = 7.0, 3.4, 5.5   # EST
-
-# RESET / BOOT tact switches (3 x 6 x 4.3, push towards the PCB)
-BUTTONS = {             # meas. [SPEC p5] back x 10.2 / 17.3, y_top 14.9
-    "RESET": (PCB_W - 10.2, PCB_H - 14.9),
-    "BOOT": (PCB_W - 17.3, PCB_H - 14.9),
-}
-BTN_W, BTN_L = 3.0, 6.0  # [SCH] SW_3X6X4.3 (long side along X, EST)
-
-# ESP32-S3-WROOM-1 module (18 x 25.5 x 3.1 per Espressif datasheet)
-ESP_X0, ESP_X1 = 155.2, 180.6   # meas. [SPEC p5]
-ESP_Y0, ESP_Y1 = 44.6, 63.4     # meas. [SPEC p5] / [DIM] notch
-ESP_T = 3.1                     # Espressif ESP32-S3-WROOM-1 datasheet
 
 # =============================================================================
-# ENCLOSURE PARAMETERS (design defaults)
+# ENCLOSURE PARAMETERS (design defaults -- a board file may override any)
 # =============================================================================
 WALL = 2.0              # side wall / floor / plate thickness
 CLR = 0.3               # clearance PCB/glass outline -> inner wall
@@ -166,7 +73,7 @@ BEZEL_T = 2.0           # front plate thickness
 GLASS_GAP = 0.2         # air gap between glass and bezel lip (no pressure)
 LIP = 2.0               # bezel overlap onto the glass edge
 WINDOW_R = 1.0          # window corner radius
-BACK_CLEAR = 7.0        # PCB back face -> inner floor (BACK_MAX_H 4.3 + margin
+BACK_CLEAR = 7.0        # PCB back face -> inner floor (tallest part + margin
                         # + room for the keyhole pockets)
 SEAM_LIP_H = 1.5        # shell alignment lip height above the seam (Z=0)
 SEAM_LIP_T = 1.0        # shell alignment lip thickness
@@ -175,55 +82,42 @@ SEAM_LIP_CLR = 0.15     # clearance of the matching rabbet in the bezel
 # Fasteners: M3 heat-set inserts in the bezel, screws from the back.
 INSERT_HOLE_D = 4.0     # M3 x 4 mm short heat-set insert (OD ~4.6) -> 4.0 hole
 INSERT_HOLE_DEPTH = 6.0
-BEZEL_BOSS_D = 7.0      # must stay clear of the glass corner (x0 = 8.05)
+BEZEL_BOSS_D = 7.0      # must stay clear of the glass corner
 SHELL_BOSS_D = 7.0
 SCREW_CLEAR_D = 3.4     # M3 clearance
 SCREW_HEAD_D = 6.2      # counterbore for M3 ISO 4762 / 7380 head (5.5-5.7)
 SCREW_HEAD_DEPTH = 3.0
 
-# Cut-out sizes
-USB_CUT_W, USB_CUT_H = 13.0, 7.5        # plug-body clearance (12 x 6.5 plug)
-P1_CUT_W, P1_CUT_H = 9.0, 5.0           # lets the 4P plug pass
-SD_CUT_W, SD_CUT_H = 14.0, 3.0
-SD_FINGER_R = 8.0                       # finger scallop for push-push card
 BTN_HOLE_D = 4.0
-TOUCH_FPC_RELIEF = 1.2                  # wall relief where touch FPC wraps
-EXPOSE_TOP_CONNECTORS = []              # e.g. ["P6_SPEAKER_JST1.25_2P"]
-TOP_CONN_CUT_W, TOP_CONN_CUT_H = 9.0, 5.0
 
 # Ventilation (slots through the back)
 VENT_W = 2.0
 VENT_PITCH = 5.0
-VENT_FIELDS = [         # (x0, x1, y0, y1) slot fields, slots run along Y
-    (30.0, 150.0, 22.0, 56.0),          # centre of the board
-    (152.0, 172.0, 66.0, 84.0),         # near the ESP32-S3 module
-]
+VENT_FIELDS = []
 
 # Keyhole slots for wall/machine mounting (screw head <= 7.5 mm, shank <= 3.8)
 KEYHOLES_ENABLE = True
-KEYHOLE_XS = (PCB_W / 2 - 50.0, PCB_W / 2 + 50.0)   # 100 mm apart
-KEYHOLE_Y = 72.0        # centre of the head-entry circle
+KEYHOLE_XS = ()
+KEYHOLE_Y = 0.0         # centre of the head-entry circle
 KEYHOLE_HEAD_D = 8.0
 KEYHOLE_SLOT_W = 4.0
 KEYHOLE_TRAVEL = 10.0   # slot length (screw hangs at Y = KEYHOLE_Y + travel)
 KEYHOLE_POCKET_H = 2.5  # room for the screw head inside the pad
 KEYHOLE_ROOF = 1.5
 
-# P1 cable strain relief: zip-tie bar on the floor next to P1
-TIEBAR_X0 = 14.0
+# Optional zip-tie bar on the inside floor (board: TIEBAR = dict(x0, yc))
+TIEBAR = None
 TIEBAR_W = 3.0
 TIEBAR_LEN = 13.0
 TIEBAR_TUNNEL_H = 2.0
 TIEBAR_TOP_T = 1.5
 
-# P1 cable channel + exit clamp (standard CAT5/5e cable to the CNC controller).
-# A U-groove on the outside of the left wall takes the cable from the P1
-# opening to the case edge; a screw-down clamp on a tongue past the edge takes
-# all pull off the connector. The CAT5 conductors are spliced to a JST 1.25
-# 4P pigtail inside the groove (24 AWG solid does not fit 1.25 mm crimps).
+# GRBL cable channel + exit clamp (standard CAT5/5e cable to the CNC
+# controller).  The CAT5 conductors are spliced to a JST 1.25 pigtail inside
+# the channel (24 AWG solid does not fit 1.25 mm crimps); the clamp takes all
+# pull off the connector.
 CHANNEL_ENABLE = True
-CHANNEL_DIR = +1        # +1: run towards y = PCB_H (SD-card edge, away from
-                        # USB-C); -1 would run past the USB-C port (blocked)
+CABLE = None            # board: dict(port=, route="side"|"straight", run=)
 CABLE_D = 6.0           # EST: CAT5/5e UTP jacket 5.0-6.5 mm -- MEASURE yours
 CH_CLR = 0.5            # groove width = CABLE_D + CH_CLR
 CH_FLOOR_T = 2.0        # groove floor (flush with the case back)
@@ -231,25 +125,54 @@ CH_OUTER_WALL = 2.0
 CH_LIP_T = 1.0          # snap lips along the groove opening (z thickness)
 CH_LIP_OVERLAP = 0.4    # per side -> opening CABLE_D + CH_CLR - 0.8
 CH_EXIT_R = 2.0         # rounded floor edge where the cable leaves the clamp
-CLAMP_TONGUE_L = 16.0   # tongue length beyond the case edge
+CH_FUNNEL_L = 8.0       # "straight" route: pocket length before the groove
+CLAMP_TONGUE_L = 16.0   # "side" route: tongue length beyond the case edge
 CLAMP_W = 10.0          # clamp bar width along the cable
 CLAMP_T = 3.0           # clamp bar thickness above the tongue
 CLAMP_SQUEEZE = 0.8     # jacket compression when the clamp is screwed down
-CLAMP_SCREW_DX = (CABLE_D + CH_CLR) / 2 + 3.5   # screw offset from cable axis
 CLAMP_BOSS_R = 3.5      # material around the inserts
 CLAMP_TOOTH_PITCH = 3.0 # grip teeth across the ridge underside
 CLAMP_TOOTH_DEPTH = 0.6
 
-# =============================================================================
-# DERIVED Z LEVELS
-# =============================================================================
-Z_PCB_BACK = -PCB_T
-Z_FLOOR_IN = Z_PCB_BACK - BACK_CLEAR
-Z_FLOOR_OUT = Z_FLOOR_IN - WALL
-Z_BEZEL_IN = Z_GLASS_TOP + GLASS_GAP
-Z_BEZEL_OUT = Z_BEZEL_IN + BEZEL_T
-Z_SEAM = 0.0
-CONN_Z0 = Z_PCB_BACK    # top-mount connectors hang from the PCB back face
+# Board data defaults (optional features)
+ANT_NOTCH = None
+TOUCH_FPC = None
+OBSTACLES = {}
+LCD_TAPE = 0.0
+
+DEFAULTS = {k: v for k, v in dict(globals()).items()
+            if k.isupper() and k not in ("HERE", "OUT", "BOARDS")}
+
+
+def load_board(env):
+    """Reset the design defaults, then apply boards/<module>.py."""
+    globals().update(DEFAULTS)
+    sys.path.insert(0, HERE)
+    try:
+        mod = importlib.import_module("boards." + BOARDS[env])
+        mod = importlib.reload(mod)
+    finally:
+        sys.path.pop(0)
+    globals().update({k: v for k, v in vars(mod).items() if k.isupper()})
+    derive()
+
+
+def derive():
+    g = globals()
+    g["HOLES"] = [(HOLE_INSET, HOLE_INSET), (PCB_W - HOLE_INSET, HOLE_INSET),
+                  (HOLE_INSET, PCB_H - HOLE_INSET),
+                  (PCB_W - HOLE_INSET, PCB_H - HOLE_INSET)]
+    g["Z_LCD0"] = LCD_TAPE
+    g["Z_GLASS0"] = g["Z_LCD0"] + LCD_T
+    g["Z_GLASS_TOP"] = g["Z_GLASS0"] + GLASS_T
+    g["Z_PCB_BACK"] = -PCB_T
+    g["Z_FLOOR_IN"] = g["Z_PCB_BACK"] - BACK_CLEAR
+    g["Z_FLOOR_OUT"] = g["Z_FLOOR_IN"] - WALL
+    g["Z_BEZEL_IN"] = g["Z_GLASS_TOP"] + GLASS_GAP
+    g["Z_BEZEL_OUT"] = g["Z_BEZEL_IN"] + BEZEL_T
+    g["Z_SEAM"] = 0.0
+    g["CONN_Z0"] = g["Z_PCB_BACK"]   # top-mount parts hang from the PCB back
+    g["CLAMP_SCREW_DX"] = (CABLE_D + CH_CLR) / 2 + 3.5   # from cable axis
 
 
 # =============================================================================
@@ -288,54 +211,25 @@ def slot_y(x, y0, y1, w, z0, z1):
             .extrude(z1 - z0).translate((0, 0, z0)))
 
 
-def ybox_x(xc, w, y0, y1, z0, z1):
-    return box(xc - w / 2, y0, z0, xc + w / 2, y1, z1)
+def edge_xy(edge, n, t):
+    """Point at outward distance n from a PCB edge, position t along it."""
+    return {"left": (-n, t), "right": (PCB_W + n, t),
+            "bottom": (t, -n), "top": (t, PCB_H + n)}[edge]
 
 
-def xbox_y(yc, w, x0, x1, z0, z1):
-    return box(x0, yc - w / 2, z0, x1, yc + w / 2, z1)
+def edge_box(edge, n0, n1, t0, t1, z0, z1):
+    """Box spanning n0..n1 outward from an edge and t0..t1 along it."""
+    xa, ya = edge_xy(edge, n0, t0)
+    xb, yb = edge_xy(edge, n1, t1)
+    return box(min(xa, xb), min(ya, yb), z0, max(xa, xb), max(ya, yb), z1)
 
 
-# =============================================================================
-# BOARD PLACEHOLDER (fit-check body)
-# =============================================================================
-def build_board():
-    parts = {}
-    pcb = outline(0.0, Z_PCB_BACK, 0.0)
-    pcb = pcb.cut(box(ANT_NOTCH_X0, ANT_NOTCH_Y0, Z_PCB_BACK - 1,
-                      PCB_W + 1, ANT_NOTCH_Y1, 1))
-    pcb = pcb.cut(box(TOUCH_FPC_X0, -1, Z_PCB_BACK - 1, TOUCH_FPC_X1, 0.9, 1))
-    for x, y in HOLES:
-        pcb = pcb.cut(cyl(x, y, HOLE_D, Z_PCB_BACK - 1, 1))
-    parts["pcb"] = pcb
+def normal_axis(edge):
+    return "|X" if edge in ("left", "right") else "|Y"
 
-    parts["lcd"] = box(LCD_X0, LCD_Y0, Z_LCD0, LCD_X0 + LCD_W, LCD_Y0 + LCD_H,
-                       Z_LCD0 + LCD_T)
-    parts["glass"] = box(GLASS_X0, GLASS_Y0, Z_GLASS0, GLASS_X0 + GLASS_W,
-                         GLASS_Y0 + GLASS_H, Z_GLASS_TOP)
 
-    zb = CONN_Z0
-    parts["usb_c"] = xbox_y(USB_YC, USB_W, -USB_OVERHANG, USB_D - USB_OVERHANG,
-                            zb - USB_H, zb)
-    parts["p1_uart"] = xbox_y(P1_YC, P1_W, 0.0, P1_D, zb - P1_H, zb)
-    parts["sd_socket"] = ybox_x(SD_XC, SD_W, PCB_H + SD_OVERHANG - SD_D,
-                                PCB_H + SD_OVERHANG, zb - SD_H, zb)
-    for name, xc in TOP_CONNECTORS.items():
-        parts[name] = ybox_x(xc, TOP_CONN_W, PCB_H - TOP_CONN_D, PCB_H,
-                             zb - TOP_CONN_H, zb)
-    for name, (x, y) in BUTTONS.items():
-        parts["sw_" + name] = box(x - BTN_L / 2, y - BTN_W / 2, zb - BACK_MAX_H,
-                                  x + BTN_L / 2, y + BTN_W / 2, zb)
-    parts["esp32s3"] = box(ESP_X0, ESP_Y0, zb - ESP_T, ESP_X1, ESP_Y1, zb)
-
-    # generic envelope for all small SMD parts, kept out of the screw bosses
-    env = box(1.0, 1.0, zb - SMD_ENVELOPE_H, PCB_W - 1.0, PCB_H - 1.0, zb)
-    for x, y in HOLES:
-        env = env.cut(cyl(x, y, SHELL_BOSS_D + 1.0, zb - 10, zb + 1))
-    env = env.cut(box(ANT_NOTCH_X0, ANT_NOTCH_Y0, zb - 10, PCB_W + 1,
-                      ANT_NOTCH_Y1, zb + 1))
-    parts["smd_envelope"] = env
-    return parts
+def ybox(x0, x1, ya, yb, z0, z1):
+    return box(x0, min(ya, yb), z0, x1, max(ya, yb), z1)
 
 
 def union_all(shapes):
@@ -347,38 +241,90 @@ def union_all(shapes):
 
 
 # =============================================================================
+# BOARD PLACEHOLDER (fit-check body)
+# =============================================================================
+def build_board():
+    parts = {}
+    pcb = outline(0.0, Z_PCB_BACK, 0.0)
+    if ANT_NOTCH:
+        a = ANT_NOTCH
+        pcb = pcb.cut(edge_box(a["edge"], -a["depth"], 1, a["t0"], a["t1"],
+                               Z_PCB_BACK - 1, 1))
+    if TOUCH_FPC:
+        f = TOUCH_FPC
+        pcb = pcb.cut(edge_box(f["edge"], -f["notch"], 1, f["t0"], f["t1"],
+                               Z_PCB_BACK - 1, 1))
+    for x, y in HOLES:
+        pcb = pcb.cut(cyl(x, y, HOLE_D, Z_PCB_BACK - 1, 1))
+    parts["pcb"] = pcb
+
+    parts["lcd"] = box(LCD_X0, LCD_Y0, Z_LCD0, LCD_X0 + LCD_W, LCD_Y0 + LCD_H,
+                       Z_LCD0 + LCD_T)
+    parts["glass"] = box(GLASS_X0, GLASS_Y0, Z_GLASS0, GLASS_X0 + GLASS_W,
+                         GLASS_Y0 + GLASS_H, Z_GLASS_TOP)
+
+    zb = CONN_Z0
+    for name, p in PORTS.items():
+        ov = p.get("overhang", 0.0)
+        parts[name] = edge_box(p["edge"], ov - p["d"], ov,
+                               p["pos"] - p["w"] / 2, p["pos"] + p["w"] / 2,
+                               zb - p["h"], zb)
+    s = SD
+    parts["sd_socket"] = edge_box(s["edge"], s["overhang"] - s["d"],
+                                  s["overhang"], s["pos"] - s["w"] / 2,
+                                  s["pos"] + s["w"] / 2, zb - s["h"], zb)
+    for name, (x, y) in BUTTONS.items():
+        parts["sw_" + name] = box(x - BTN_L / 2, y - BTN_W / 2, zb - BACK_MAX_H,
+                                  x + BTN_L / 2, y + BTN_W / 2, zb)
+    parts["esp32"] = box(ESP["x0"], ESP["y0"], zb - ESP["t"], ESP["x1"],
+                         ESP["y1"], zb)
+    for name, (x0, y0, x1, y1, h) in OBSTACLES.items():
+        parts[name] = box(x0, y0, zb - h, x1, y1, zb)
+
+    # generic envelope for all small SMD parts, kept out of the screw bosses
+    # (keep-out circle also covers the envelope corner when holes sit further in)
+    env = box(1.0, 1.0, zb - SMD_ENVELOPE_H, PCB_W - 1.0, PCB_H - 1.0, zb)
+    keep_d = max(SHELL_BOSS_D + 1.0, 2 * math.sqrt(2) * (HOLE_INSET - 1.0) + 0.5)
+    for x, y in HOLES:
+        env = env.cut(cyl(x, y, keep_d, zb - 10, zb + 1))
+    if ANT_NOTCH:
+        a = ANT_NOTCH
+        env = env.cut(edge_box(a["edge"], -a["depth"], 1, a["t0"], a["t1"],
+                               zb - 10, zb + 1))
+    parts["smd_envelope"] = env
+    return parts
+
+
+# =============================================================================
 # CUT-OUTS shared by both halves (anything crossing the seam cuts both)
 # =============================================================================
 def side_cutouts():
     cuts = []
     out = CLR + WALL + 2.0
-    # USB-C: left wall, plug body clearance, centred on the receptacle
-    usb_zc = CONN_Z0 - USB_H / 2
-    cuts.append(rrect(-out, USB_YC - USB_CUT_W / 2, 0.5, USB_YC + USB_CUT_W / 2,
-                      0.0, usb_zc - USB_CUT_H / 2, usb_zc + USB_CUT_H / 2)
-                .edges("|X").fillet(1.5))
-    # P1 cable exit: left wall
-    p1_zc = CONN_Z0 - P1_H / 2
-    cuts.append(box(-out, P1_YC - P1_CUT_W / 2, p1_zc - P1_CUT_H / 2,
-                    0.5, P1_YC + P1_CUT_W / 2, p1_zc + P1_CUT_H / 2)
-                .edges("|X").fillet(1.0))
-    # micro-SD slot: top wall + finger scallop on the outside
-    sd_zc = CONN_Z0 - SD_H / 2
-    cuts.append(box(SD_XC - SD_CUT_W / 2, PCB_H - 0.5, sd_zc - SD_CUT_H / 2,
-                    SD_XC + SD_CUT_W / 2, PCB_H + out, sd_zc + SD_CUT_H / 2))
-    y_out = PCB_H + CLR + WALL
-    cuts.append(cyl(SD_XC, y_out + SD_FINGER_R - 1.2, 2 * SD_FINGER_R,
-                    sd_zc - 3.0, min(sd_zc + 3.0, Z_SEAM - 0.01)))
-    # optional top-edge connectors
-    for name in EXPOSE_TOP_CONNECTORS:
-        xc = TOP_CONNECTORS[name]
-        zc = CONN_Z0 - TOP_CONN_H / 2
-        cuts.append(box(xc - TOP_CONN_CUT_W / 2, PCB_H - 0.5,
-                        zc - TOP_CONN_CUT_H / 2, xc + TOP_CONN_CUT_W / 2,
-                        PCB_H + out, zc + TOP_CONN_CUT_H / 2))
-    # touch FPC wraps around the bottom edge: relief in the inner wall face
-    cuts.append(box(TOUCH_FPC_X0 - 1.0, -CLR - TOUCH_FPC_RELIEF, Z_PCB_BACK - 1.5,
-                    TOUCH_FPC_X1 + 1.0, 0.5, Z_GLASS_TOP))
+    for p in PORTS.values():
+        if not p.get("cut"):
+            continue
+        zc = CONN_Z0 - p["h"] / 2
+        c = edge_box(p["edge"], -0.5, out, p["pos"] - p["cut_w"] / 2,
+                     p["pos"] + p["cut_w"] / 2, zc - p["cut_h"] / 2,
+                     zc + p["cut_h"] / 2)
+        if p.get("fillet"):
+            c = c.edges(normal_axis(p["edge"])).fillet(p["fillet"])
+        cuts.append(c)
+    # micro-SD slot + finger scallop on the outside
+    s = SD
+    sd_zc = CONN_Z0 - s["h"] / 2
+    cuts.append(edge_box(s["edge"], -0.5, out, s["pos"] - s["cut_w"] / 2,
+                         s["pos"] + s["cut_w"] / 2, sd_zc - s["cut_h"] / 2,
+                         sd_zc + s["cut_h"] / 2))
+    fx, fy = edge_xy(s["edge"], CLR + WALL + s["finger_r"] - 1.2, s["pos"])
+    cuts.append(cyl(fx, fy, 2 * s["finger_r"], sd_zc - 3.0,
+                    min(sd_zc + 3.0, Z_SEAM - 0.01)))
+    # touch FPC wraps around an edge: relief in the inner wall face
+    if TOUCH_FPC:
+        f = TOUCH_FPC
+        cuts.append(edge_box(f["edge"], -0.5, CLR + f["relief"], f["t0"] - 1.0,
+                             f["t1"] + 1.0, Z_PCB_BACK - 1.5, Z_GLASS_TOP))
     return cuts
 
 
@@ -464,15 +410,16 @@ def build_shell():
         for x in KEYHOLE_XS:
             shell = shell.union(keyhole_pad(x))
 
-    # zip-tie bar for the P1 cable (two legs + bridge)
-    leg_h = TIEBAR_TUNNEL_H
-    y0, y1 = P1_YC - TIEBAR_LEN / 2, P1_YC + TIEBAR_LEN / 2
-    x0, x1 = TIEBAR_X0, TIEBAR_X0 + TIEBAR_W
-    tie = box(x0, y0, Z_FLOOR_IN - 0.01, x1, y1,
-              Z_FLOOR_IN + leg_h + TIEBAR_TOP_T)
-    tie = tie.cut(box(x0 - 1, y0 + 2.0, Z_FLOOR_IN - 1, x1 + 1, y1 - 2.0,
-                      Z_FLOOR_IN + leg_h))
-    shell = shell.union(tie)
+    # optional zip-tie bar (two legs + bridge)
+    if TIEBAR:
+        leg_h = TIEBAR_TUNNEL_H
+        y0, y1 = TIEBAR["yc"] - TIEBAR_LEN / 2, TIEBAR["yc"] + TIEBAR_LEN / 2
+        x0, x1 = TIEBAR["x0"], TIEBAR["x0"] + TIEBAR_W
+        tie = box(x0, y0, Z_FLOOR_IN - 0.01, x1, y1,
+                  Z_FLOOR_IN + leg_h + TIEBAR_TOP_T)
+        tie = tie.cut(box(x0 - 1, y0 + 2.0, Z_FLOOR_IN - 1, x1 + 1, y1 - 2.0,
+                          Z_FLOOR_IN + leg_h))
+        shell = shell.union(tie)
 
     # screw holes + counterbores from the outside
     for x, y in HOLES:
@@ -500,7 +447,7 @@ def build_shell():
             for c in keyhole_cuts(x):
                 shell = shell.cut(c)
 
-    if CHANNEL_ENABLE:
+    if CHANNEL_ENABLE and CABLE:
         shell = add_channel(shell)
 
     for c in side_cutouts():
@@ -509,68 +456,145 @@ def build_shell():
 
 
 # =============================================================================
-# P1 CABLE CHANNEL + CLAMP
+# GRBL CABLE CHANNEL + CLAMP
+# Built in a canonical frame, then mirrored into place:
+#   "side"     canonical = exit through the LEFT wall, run towards +Y (top)
+#   "straight" canonical = exit through the BOTTOM wall, run towards -Y
 # =============================================================================
+def cable_port():
+    return PORTS[CABLE["port"]]
+
+
+def channel_frame():
+    """(route, mirror_x, mirror_y, canonical port position)."""
+    p = cable_port()
+    if CABLE["route"] == "side":
+        assert p["edge"] in ("left", "right"), "side route needs a left/right port"
+        mx = p["edge"] == "right"
+        my = CABLE["run"] == "bottom"
+        return "side", mx, my, (PCB_H - p["pos"]) if my else p["pos"]
+    assert p["edge"] in ("top", "bottom"), "straight route needs a top/bottom port"
+    return "straight", False, p["edge"] == "top", p["pos"]
+
+
+def to_actual(wp):
+    _, mx, my, _ = channel_frame()
+    if mx:
+        wp = wp.mirror("YZ", (PCB_W / 2, 0, 0))
+    if my:
+        wp = wp.mirror("XZ", (0, PCB_H / 2, 0))
+    return wp
+
+
+def act_x(x):
+    return PCB_W - x if channel_frame()[1] else x
+
+
+def act_y(y):
+    return PCB_H - y if channel_frame()[2] else y
+
+
 def channel_geom():
-    """All channel/clamp coordinates (assembly frame) in one place."""
-    g = {}
-    d = CHANNEL_DIR
+    """All channel/clamp coordinates in the canonical frame."""
+    route, _, _, pc = channel_frame()
+    p = cable_port()
+    g = {"route": route}
     g["ch_w"] = CABLE_D + CH_CLR
-    g["gx1"] = -(CLR + WALL)                     # groove inner face = wall face
-    g["gx0"] = g["gx1"] - g["ch_w"]
-    g["dx0"] = g["gx0"] - CH_OUTER_WALL          # duct outer face
-    g["xc"] = (g["gx0"] + g["gx1"]) / 2
     g["zg0"] = Z_FLOOR_OUT + CH_FLOOR_T          # groove floor
     g["zg1"] = g["zg0"] + g["ch_w"] + CH_LIP_T   # duct / tongue top
-    # y: a = behind P1, b = case edge, c = tongue end
-    g["y_p1"] = P1_YC - d * P1_CUT_W / 2         # groove starts at the P1 window
-    g["ya"] = g["y_p1"] - d * CH_OUTER_WALL
-    g["yb"] = (PCB_H + CLR + WALL) if d > 0 else -(CLR + WALL)
-    g["yc"] = g["yb"] + d * CLAMP_TONGUE_L
-    g["y_clamp"] = g["yb"] + d * (CLAMP_TONGUE_L / 2 + 0.5)
+    g["cable_top"] = g["zg0"] + CABLE_D          # cable resting on the floor
+    yw = -(CLR + WALL)                           # outer wall face (bottom/left)
+    if route == "side":
+        d = +1
+        g["gx1"] = yw                            # groove inner face = wall face
+        g["gx0"] = g["gx1"] - g["ch_w"]
+        g["dx0"] = g["gx0"] - CH_OUTER_WALL      # duct outer face
+        g["xc"] = (g["gx0"] + g["gx1"]) / 2
+        # y: a = behind the port, b = case edge, c = tongue end
+        g["y_p1"] = pc - d * p["cut_w"] / 2      # groove starts at the window
+        g["ya"] = g["y_p1"] - d * CH_OUTER_WALL
+        g["yb"] = PCB_H + CLR + WALL
+        g["yc"] = g["yb"] + d * CLAMP_TONGUE_L
+        g["y_clamp"] = g["yb"] + d * (CLAMP_TONGUE_L / 2 + 0.5)
+        g["tongue_y0"] = g["yb"] - d * 1.0
+        g["tongue_len"] = CLAMP_TONGUE_L
+    else:
+        d = -1
+        g["xc"] = pc
+        g["fw"] = max(p["cut_w"], g["ch_w"])     # pocket width
+        g["yw"] = yw
+        g["y_f1"] = yw - CH_FUNNEL_L             # pocket end
+        g["y_clamp"] = g["y_f1"] - 1.0 - CLAMP_W / 2
+        g["yc"] = g["y_clamp"] - CLAMP_W / 2 - 3.0
+        g["tongue_y0"] = yw + 1.0
+        g["tongue_len"] = yw - g["yc"]
+    g["d"] = d
     g["tx0"] = g["xc"] - CLAMP_SCREW_DX - CLAMP_BOSS_R
     g["tx1"] = g["xc"] + CLAMP_SCREW_DX + CLAMP_BOSS_R
-    g["cable_top"] = g["zg0"] + CABLE_D          # cable resting on the floor
+    if route == "straight":
+        g["tx0"] = min(g["tx0"], pc - g["fw"] / 2 - CH_OUTER_WALL)
+        g["tx1"] = max(g["tx1"], pc + g["fw"] / 2 + CH_OUTER_WALL)
     assert g["zg1"] < Z_SEAM, "channel taller than the back shell"
+    zc = CONN_Z0 - p["h"] / 2
+    assert zc - p["cut_h"] / 2 < g["zg1"] and zc + p["cut_h"] / 2 > g["zg0"], \
+        "cable port opening does not reach the groove"
     return g
 
 
-def ybox(x0, x1, ya, yb, z0, z1):
-    return box(x0, min(ya, yb), z0, x1, max(ya, yb), z1)
+def exit_round(g, xa, xb):
+    """Rounded floor edge at the groove exit (bend protection)."""
+    r, d = CH_EXIT_R, g["d"]
+    corner = ybox(xa, xb, g["yc"] - d * r, g["yc"] + d * 0.01,
+                  g["zg0"] - r, g["zg0"] + 0.01)
+    keep = (cq.Workplane("YZ").circle(r).extrude(xb - xa + 0.02)
+            .translate((xa - 0.01, g["yc"] - d * r, g["zg0"] - r)))
+    return corner.cut(keep)
+
+
+def channel_ops():
+    """[(op, solid)] in the canonical frame; op = 'union' | 'cut'."""
+    g = channel_geom()
+    d = g["d"]
+    ops = []
+    tongue = ybox(g["tx0"], g["tx1"], g["tongue_y0"], g["yc"], Z_FLOOR_OUT,
+                  g["zg1"]).edges("|Z").fillet(2.0)
+    if g["route"] == "side":
+        # duct along the wall (overlaps the wall by 0.5 for a solid union)
+        ops.append(("union", ybox(g["dx0"], g["gx1"] + 0.5, g["ya"], g["yb"],
+                                  Z_FLOOR_OUT, g["zg1"])))
+        ops.append(("union", tongue))
+        # groove (open to the front), through the tongue end
+        ops.append(("cut", ybox(g["gx0"], g["gx1"], g["y_p1"],
+                                g["yc"] + d * 1.0, g["zg0"], g["zg1"] + 1.0)))
+        # snap lips along the duct part only (the clamp ridge needs a clear groove)
+        lz0 = g["zg1"] - CH_LIP_T
+        for lx0, lx1 in ((g["gx0"] - 0.01, g["gx0"] + CH_LIP_OVERLAP),
+                         (g["gx1"] - CH_LIP_OVERLAP, g["gx1"] + 0.01)):
+            ops.append(("union", ybox(lx0, lx1, g["y_p1"], g["yb"], lz0,
+                                      g["zg1"])))
+        ops.append(("cut", exit_round(g, g["gx0"], g["gx1"])))
+    else:
+        ops.append(("union", tongue))
+        half = g["ch_w"] / 2
+        # pocket behind the opening (pigtail from any connector in it)
+        ops.append(("cut", ybox(g["xc"] - g["fw"] / 2, g["xc"] + g["fw"] / 2,
+                                g["yw"], g["y_f1"], g["zg0"], g["zg1"] + 1.0)))
+        # groove through the clamp to the tongue end
+        ops.append(("cut", ybox(g["xc"] - half, g["xc"] + half, g["y_f1"] + 0.01,
+                                g["yc"] + d * 1.0, g["zg0"], g["zg1"] + 1.0)))
+        ops.append(("cut", exit_round(g, g["xc"] - half, g["xc"] + half)))
+    # heat-set inserts for the clamp screws (from the front face)
+    for sx in (-1, 1):
+        ops.append(("cut", cyl(g["xc"] + sx * CLAMP_SCREW_DX, g["y_clamp"],
+                               INSERT_HOLE_D, g["zg1"] - INSERT_HOLE_DEPTH,
+                               g["zg1"] + 1)))
+    return ops
 
 
 def add_channel(shell):
-    g = channel_geom()
-    d = CHANNEL_DIR
-    # duct along the wall (overlaps the wall by 0.5 for a solid union)
-    duct = ybox(g["dx0"], g["gx1"] + 0.5, g["ya"], g["yb"], Z_FLOOR_OUT, g["zg1"])
-    # clamp tongue past the case edge (starts 1 mm inside the edge)
-    tongue = ybox(g["tx0"], g["tx1"], g["yb"] - d * 1.0, g["yc"], Z_FLOOR_OUT,
-                  g["zg1"]).edges("|Z").fillet(2.0)
-    shell = shell.union(duct).union(tongue)
-
-    # groove (open to the front), through the tongue end
-    shell = shell.cut(ybox(g["gx0"], g["gx1"], g["y_p1"], g["yc"] + d * 1.0,
-                           g["zg0"], g["zg1"] + 1.0))
-    # snap lips along the duct part only (the clamp ridge needs a clear groove)
-    lz0 = g["zg1"] - CH_LIP_T
-    for lx0, lx1 in ((g["gx0"] - 0.01, g["gx0"] + CH_LIP_OVERLAP),
-                     (g["gx1"] - CH_LIP_OVERLAP, g["gx1"] + 0.01)):
-        shell = shell.union(ybox(lx0, lx1, g["y_p1"], g["yb"], lz0, g["zg1"]))
-
-    # rounded exit edge of the groove floor (bend protection)
-    r = CH_EXIT_R
-    corner = ybox(g["gx0"], g["gx1"], g["yc"] - d * r, g["yc"] + d * 0.01,
-                  g["zg0"] - r, g["zg0"] + 0.01)
-    keep = (cq.Workplane("YZ").circle(r).extrude(g["ch_w"] + 0.02)
-            .translate((g["gx0"] - 0.01, g["yc"] - d * r, g["zg0"] - r)))
-    shell = shell.cut(corner.cut(keep))
-
-    # heat-set inserts for the clamp screws (from the front face)
-    for sx in (-1, 1):
-        shell = shell.cut(cyl(g["xc"] + sx * CLAMP_SCREW_DX, g["y_clamp"],
-                              INSERT_HOLE_D, g["zg1"] - INSERT_HOLE_DEPTH,
-                              g["zg1"] + 1))
+    for op, solid in channel_ops():
+        solid = to_actual(solid)
+        shell = shell.union(solid) if op == "union" else shell.cut(solid)
     return shell
 
 
@@ -594,16 +618,18 @@ def build_clamp():
     for sx in (-1, 1):
         clamp = clamp.cut(cyl(g["xc"] + sx * CLAMP_SCREW_DX, g["y_clamp"],
                               SCREW_CLEAR_D, rz0 - 1, g["zg1"] + CLAMP_T + 1))
-    return clamp
+    return to_actual(clamp)
 
 
 def cable_probe():
-    """CAT5 jacket lying on the groove floor, from the P1 window to past the end."""
+    """CAT5 jacket lying on the groove floor, from the opening to past the end."""
     g = channel_geom()
-    d = CHANNEL_DIR
-    y0, y1 = g["y_p1"] + d * 0.5, g["yc"] + d * 8.0
-    return (cq.Workplane("XZ").circle(CABLE_D / 2).extrude(-(abs(y1 - y0)))
-            .translate((g["xc"], min(y0, y1), g["zg0"] + CABLE_D / 2)))
+    d = g["d"]
+    y0 = g["y_p1"] + 0.5 if g["route"] == "side" else g["yw"] - 0.01
+    y1 = g["yc"] + d * 8.0
+    probe = (cq.Workplane("XZ").circle(CABLE_D / 2).extrude(-(abs(y1 - y0)))
+             .translate((g["xc"], min(y0, y1), g["zg0"] + CABLE_D / 2)))
+    return to_actual(probe)
 
 
 # =============================================================================
@@ -625,28 +651,30 @@ def probes():
     """Bodies that must pass freely through the walls (plug/card/finger)."""
     zb = CONN_Z0
     far = CLR + WALL + 6.0
-    p = {}
-    usb_zc = zb - USB_H / 2
-    p["USB-C plug body"] = xbox_y(USB_YC, USB_PLUG_W, -far, -USB_OVERHANG,
-                                  usb_zc - USB_PLUG_H / 2, usb_zc + USB_PLUG_H / 2)
-    p["USB-C plug + 30 mm overmould"] = xbox_y(USB_YC, USB_PLUG_W, -30.0,
-                                               -USB_OVERHANG, usb_zc - USB_PLUG_H / 2,
-                                               usb_zc + USB_PLUG_H / 2)
-    p1_zc = zb - P1_H / 2
-    p["P1 JST plug"] = xbox_y(P1_YC, P1_PLUG_W, -far, 0.0,
-                              p1_zc - P1_PLUG_H / 2, p1_zc + P1_PLUG_H / 2)
-    sd_zc = zb - SD_H / 2
-    p["micro-SD card"] = ybox_x(SD_XC, SD_CARD_W, PCB_H + SD_OVERHANG,
-                                PCB_H + far, sd_zc - SD_CARD_T / 2,
-                                sd_zc + SD_CARD_T / 2)
+    pr = {}
+    for name, p in PORTS.items():
+        if not p.get("cut"):
+            continue
+        ov = p.get("overhang", 0.0)
+        zc = zb - p["h"] / 2
+        t0, t1 = p["pos"] - p["plug_w"] / 2, p["pos"] + p["plug_w"] / 2
+        z0, z1 = zc - p["plug_h"] / 2, zc + p["plug_h"] / 2
+        label = p.get("label", name)
+        pr[label] = edge_box(p["edge"], ov, far, t0, t1, z0, z1)
+        if p.get("plug_len"):
+            pr[label + " + %.0f mm overmould" % p["plug_len"]] = edge_box(
+                p["edge"], ov, p["plug_len"], t0, t1, z0, z1)
+    s = SD
+    sd_zc = zb - s["h"] / 2
+    pr["micro-SD card"] = edge_box(s["edge"], s["overhang"], far,
+                                   s["pos"] - s["card_w"] / 2,
+                                   s["pos"] + s["card_w"] / 2,
+                                   sd_zc - s["card_t"] / 2,
+                                   sd_zc + s["card_t"] / 2)
     for name, (x, y) in BUTTONS.items():
-        p[name + " button access (3 mm pin)"] = cyl(x, y, 3.0, Z_FLOOR_OUT - 5,
-                                                    zb - BACK_MAX_H)
-    for name in EXPOSE_TOP_CONNECTORS:
-        xc = TOP_CONNECTORS[name]
-        p[name] = ybox_x(xc, TOP_CONN_W - 1, PCB_H, PCB_H + far,
-                         zb - TOP_CONN_H + 0.5, zb - 0.5)
-    return p
+        pr[name + " button access (3 mm pin)"] = cyl(x, y, 3.0, Z_FLOOR_OUT - 5,
+                                                     zb - BACK_MAX_H)
+    return pr
 
 
 def bbox_str(shape):
@@ -663,7 +691,7 @@ def run_checks(bezel, shell, board, clamp=None):
     if clamp is not None:
         files.insert(2, "clamp.step")
     for fn in files:
-        path = os.path.join(HERE, fn)
+        path = os.path.join(OUT, fn)
         imp = cq.importers.importStep(path)
         solids = imp.solids().vals()
         v = sum(s.Volume() for s in solids)
@@ -672,14 +700,15 @@ def run_checks(bezel, shell, board, clamp=None):
                                                else cq.Compound.makeCompound(solids))))
 
     print("\n=== Interference: board placeholder vs shells (should be ~0) ===")
+    shown = {"pcb", "glass", "lcd", "sd_socket", "esp32"} | \
+        {n for n, p in PORTS.items() if p.get("cut")}
     for pname, part in (("bezel", bezel), ("back_shell", shell)):
         for bname, b in board.items():
             v = inter_vol(part, b)
             flag = "OK" if v < 1e-3 else "COLLISION"
             if v >= 1e-3:
                 ok = False
-            if v >= 1e-3 or bname in ("pcb", "glass", "lcd", "usb_c", "p1_uart",
-                                      "sd_socket"):
+            if v >= 1e-3 or bname in shown:
                 print("  %-11s x %-22s %10.4f mm^3  %s" % (pname, bname, v, flag))
     v = inter_vol(bezel, shell)
     print("  bezel       x back_shell             %10.4f mm^3  %s"
@@ -687,15 +716,15 @@ def run_checks(bezel, shell, board, clamp=None):
     ok &= v < 1e-3
 
     print("\n=== Cut-out alignment: mating bodies through the walls (should be ~0) ===")
-    for name, pr in probes().items():
-        v1, v2 = inter_vol(pr, bezel), inter_vol(pr, shell)
+    for name, prb in probes().items():
+        v1, v2 = inter_vol(prb, bezel), inter_vol(prb, shell)
         good = v1 < 1e-3 and v2 < 1e-3
         ok &= good
-        print("  %-34s bezel %8.4f  shell %8.4f  %s"
+        print("  %-38s bezel %8.4f  shell %8.4f  %s"
               % (name, v1, v2, "OK" if good else "BLOCKED"))
 
     if clamp is not None:
-        print("\n=== P1 cable channel + clamp ===")
+        print("\n=== GRBL cable channel + clamp (%s route) ===" % CABLE["route"])
         cab = cable_probe()
         for name, part in (("back_shell", shell), ("bezel", bezel)):
             v = inter_vol(cab, part)
@@ -713,17 +742,20 @@ def run_checks(bezel, shell, board, clamp=None):
         print("  clamp squeezes cable: %.1f mm^3 overlap (%.1f mm)  %s"
               % (v, CLAMP_SQUEEZE, "OK" if v > 1.0 else "NO GRIP"))
         g = channel_geom()
-        print("  channel protrudes %.1f mm beyond the side wall, tongue %.1f mm "
-              "beyond the edge; clamp screws M3 x %.0f"
-              % (g["gx1"] - g["dx0"], CLAMP_TONGUE_L,
-                 CLAMP_T + INSERT_HOLE_DEPTH - 1.0))
+        if g["route"] == "side":
+            print("  channel protrudes %.1f mm beside the wall, tongue %.1f mm "
+                  "past the edge" % (g["gx1"] - g["dx0"], g["tongue_len"]))
+        else:
+            print("  pocket %.1f mm wide, tongue %.1f mm past the edge"
+                  % (g["fw"], g["tongue_len"]))
+        print("  clamp screws M3 x %.0f" % (CLAMP_T + INSERT_HOLE_DEPTH - 1.0))
 
     print("\n=== Window vs active area ===")
     wx0, wx1 = GLASS_X0 + LIP, GLASS_X0 + GLASS_W - LIP
     wy0, wy1 = GLASS_Y0 + LIP, GLASS_Y0 + GLASS_H - LIP
     print("  window x[%.2f, %.2f] y[%.2f, %.2f]  (%.2f x %.2f)"
           % (wx0, wx1, wy0, wy1, wx1 - wx0, wy1 - wy0))
-    # AA edges in board coords, worst case of either drawing orientation
+    # AA edges in board coords, worst case of either orientation
     mx = min(LCD_X0 + AA_MIN_MARGIN_X - wx0,
              wx1 - (LCD_X0 + LCD_W - AA_MIN_MARGIN_X))
     my = min(LCD_Y0 + AA_MIN_MARGIN_Y - wy0,
@@ -737,7 +769,7 @@ def run_checks(bezel, shell, board, clamp=None):
     print("  head seat z=%.2f, insert z=0..%.1f -> needs M3 x %.1f (use M3x12, tip at z=%.1f)"
           % (Z_FLOOR_OUT + SCREW_HEAD_DEPTH, INSERT_HOLE_DEPTH, screw_len,
              Z_FLOOR_OUT + SCREW_HEAD_DEPTH + 12))
-    print("\n=== Overall enclosure size ===")
+    print("\n=== Overall enclosure size (without channel/tongue) ===")
     print("  %.1f x %.1f x %.1f mm (z %.2f .. %.2f)"
           % (PCB_W + 2 * (CLR + WALL), PCB_H + 2 * (CLR + WALL),
              Z_BEZEL_OUT - Z_FLOOR_OUT, Z_FLOOR_OUT, Z_BEZEL_OUT))
@@ -805,8 +837,17 @@ def render_section(named, path, axis, at, title):
     plt.close(fig)
 
 
+
+
+def port_section(named, path, edge, pos, title):
+    if edge in ("left", "right"):
+        render_section(named, path, "y", pos, "Section Y=%.1f (%s)" % (pos, title))
+    else:
+        render_section(named, path, "x", pos, "Section X=%.1f (%s)" % (pos, title))
+
+
 def render_all(bezel, shell, board, clamp=None):
-    out = lambda n: os.path.join(HERE, n)
+    out = lambda n: os.path.join(OUT, n)
     shells = [bezel.val(), shell.val()] + ([clamp.val()] if clamp is not None else [])
     front = cq.Compound.makeCompound(
         shells + [board[k].val() for k in ("glass", "pcb")])
@@ -822,45 +863,52 @@ def render_all(bezel, shell, board, clamp=None):
         named.append(("clamp", clamp, "#e74c3c"))
         named.append(("CAT5 cable", cable_probe(), "#3498db"))
     pal = {"pcb": "#d9a520", "lcd": "#9aa5b1", "glass": "#5dade2",
-           "usb_c": "#c0392b", "p1_uart": "#27ae60", "sd_socket": "#8e44ad",
-           "smd_envelope": "#f5cba7", "esp32s3": "#16a085"}
+           "sd_socket": "#8e44ad", "smd_envelope": "#f5cba7", "esp32": "#16a085"}
     for n, b in board.items():
         named.append(("board: " + n, b, pal.get(n, "#e67e22")))
-    render_section(named, out("preview_section_usb.png"), "y", USB_YC,
-                   "Section Y=%.1f (through USB-C)" % USB_YC)
-    render_section(named, out("preview_section_p1.png"), "y", P1_YC,
-                   "Section Y=%.1f (through P1 UART connector)" % P1_YC)
-    render_section(named, out("preview_section_sd.png"), "x", SD_XC,
-                   "Section X=%.1f (through micro-SD slot)" % SD_XC)
+    for name, p in PORTS.items():
+        if p.get("cut"):
+            port_section(named, out("preview_section_%s.png" % name), p["edge"],
+                         p["pos"], "through %s" % name)
+    port_section(named, out("preview_section_sd.png"), SD["edge"], SD["pos"],
+                 "through micro-SD slot")
     if clamp is not None:
         g = channel_geom()
-        render_section(named, out("preview_section_clamp.png"), "y", g["y_clamp"],
-                       "Section Y=%.1f (through the cable clamp)" % g["y_clamp"])
-        render_section(named, out("preview_section_channel.png"), "x", g["xc"],
-                       "Section X=%.1f (along the cable channel)" % g["xc"])
+        render_section(named, out("preview_section_clamp.png"), "y",
+                       act_y(g["y_clamp"]),
+                       "Section Y=%.1f (through the cable clamp)" % act_y(g["y_clamp"]))
+        render_section(named, out("preview_section_channel.png"), "x",
+                       act_x(g["xc"]),
+                       "Section X=%.1f (along the cable channel)" % act_x(g["xc"]))
+        sx = -1.2 if act_x(g["xc"]) < PCB_W / 2 else 1.2
+        sy = 1.6 if act_y(g["y_clamp"]) > PCB_H / 2 else -1.6
         render_view(cq.Compound.makeCompound(shells), out("preview_channel.png"),
-                    (-1.2, 1.6, 1.0))
+                    (sx, sy, 1.0))
 
 
 # =============================================================================
 # MAIN
 # =============================================================================
-def main():
-    do_png = "--no-png" not in sys.argv
+def build_and_export(env, do_png):
+    global OUT
+    load_board(env)
+    OUT = os.path.join(HERE, env)
+    os.makedirs(OUT, exist_ok=True)
+    print("\n" + "=" * 78 + "\n%s -> %s\n" % (TITLE, OUT) + "=" * 78)
     print("Building board placeholder ...")
     board = build_board()
     print("Building bezel ...")
     bezel = build_bezel()
     print("Building back shell ...")
     shell = build_shell()
-    clamp = build_clamp() if CHANNEL_ENABLE else None
+    clamp = build_clamp() if CHANNEL_ENABLE and CABLE else None
 
     # ---- STEP (assembly coordinates) ----
-    cq.exporters.export(bezel, os.path.join(HERE, "bezel.step"))
-    cq.exporters.export(shell, os.path.join(HERE, "back_shell.step"))
+    cq.exporters.export(bezel, os.path.join(OUT, "bezel.step"))
+    cq.exporters.export(shell, os.path.join(OUT, "back_shell.step"))
     if clamp is not None:
-        cq.exporters.export(clamp, os.path.join(HERE, "clamp.step"))
-    assy = cq.Assembly(name="ESP32-8048S070C_enclosure")
+        cq.exporters.export(clamp, os.path.join(OUT, "clamp.step"))
+    assy = cq.Assembly(name=env + "_enclosure")
     assy.add(shell, name="back_shell", color=cq.Color(0.25, 0.25, 0.28))
     assy.add(bezel, name="bezel", color=cq.Color(0.15, 0.15, 0.15))
     if clamp is not None:
@@ -870,20 +918,20 @@ def main():
     for name, b in board.items():
         c = colors.get(name, (0.9, 0.9, 0.9))
         assy.add(b, name="board_" + name, color=cq.Color(*c))
-    assy.save(os.path.join(HERE, "assembly.step"), exportType="STEP")
+    assy.save(os.path.join(OUT, "assembly.step"), exportType="STEP")
 
     # ---- STL in print orientation ----
     bezel_print = bezel.rotate((0, 0, 0), (1, 0, 0), 180).translate(
         (0, 0, Z_BEZEL_OUT))           # front face down on the bed
     shell_print = shell.translate((0, 0, -Z_FLOOR_OUT))   # floor on the bed
-    cq.exporters.export(bezel_print, os.path.join(HERE, "bezel.stl"),
+    cq.exporters.export(bezel_print, os.path.join(OUT, "bezel.stl"),
                         tolerance=0.02, angularTolerance=0.1)
-    cq.exporters.export(shell_print, os.path.join(HERE, "back_shell.stl"),
+    cq.exporters.export(shell_print, os.path.join(OUT, "back_shell.stl"),
                         tolerance=0.02, angularTolerance=0.1)
     if clamp is not None:              # flat top on the bed, ridge up
         top = channel_geom()["zg1"] + CLAMP_T
         clamp_print = clamp.rotate((0, 0, 0), (1, 0, 0), 180).translate((0, 0, top))
-        cq.exporters.export(clamp_print, os.path.join(HERE, "clamp.stl"),
+        cq.exporters.export(clamp_print, os.path.join(OUT, "clamp.stl"),
                             tolerance=0.02, angularTolerance=0.1)
 
     ok = run_checks(bezel, shell, board, clamp)
@@ -891,7 +939,21 @@ def main():
     if do_png:
         print("\nRendering previews ...")
         render_all(bezel, shell, board, clamp)
-    return 0 if ok else 1
+    return ok
+
+
+def main():
+    do_png = "--no-png" not in sys.argv
+    envs = [a for a in sys.argv[1:] if not a.startswith("--")] or list(BOARDS)
+    unknown = [e for e in envs if e not in BOARDS]
+    if unknown:
+        print("unknown board(s): %s (known: %s)" % (", ".join(unknown),
+                                                     ", ".join(BOARDS)))
+        return 2
+    results = {env: build_and_export(env, do_png) for env in envs}
+    print("\n" + "\n".join("%-18s %s" % (e, "OK" if r else "CHECKS FAILED")
+                           for e, r in results.items()))
+    return 0 if all(results.values()) else 1
 
 
 if __name__ == "__main__":
