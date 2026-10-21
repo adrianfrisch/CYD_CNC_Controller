@@ -216,6 +216,30 @@ TIEBAR_LEN = 13.0
 TIEBAR_TUNNEL_H = 2.0
 TIEBAR_TOP_T = 1.5
 
+# P1 cable channel + exit clamp (standard CAT5/5e cable to the CNC controller).
+# A U-groove on the outside of the left wall takes the cable from the P1
+# opening to the case edge; a screw-down clamp on a tongue past the edge takes
+# all pull off the connector. The CAT5 conductors are spliced to a JST 1.25
+# 4P pigtail inside the groove (24 AWG solid does not fit 1.25 mm crimps).
+CHANNEL_ENABLE = True
+CHANNEL_DIR = +1        # +1: run towards y = PCB_H (SD-card edge, away from
+                        # USB-C); -1 would run past the USB-C port (blocked)
+CABLE_D = 6.0           # EST: CAT5/5e UTP jacket 5.0-6.5 mm -- MEASURE yours
+CH_CLR = 0.5            # groove width = CABLE_D + CH_CLR
+CH_FLOOR_T = 2.0        # groove floor (flush with the case back)
+CH_OUTER_WALL = 2.0
+CH_LIP_T = 1.0          # snap lips along the groove opening (z thickness)
+CH_LIP_OVERLAP = 0.4    # per side -> opening CABLE_D + CH_CLR - 0.8
+CH_EXIT_R = 2.0         # rounded floor edge where the cable leaves the clamp
+CLAMP_TONGUE_L = 16.0   # tongue length beyond the case edge
+CLAMP_W = 10.0          # clamp bar width along the cable
+CLAMP_T = 3.0           # clamp bar thickness above the tongue
+CLAMP_SQUEEZE = 0.8     # jacket compression when the clamp is screwed down
+CLAMP_SCREW_DX = (CABLE_D + CH_CLR) / 2 + 3.5   # screw offset from cable axis
+CLAMP_BOSS_R = 3.5      # material around the inserts
+CLAMP_TOOTH_PITCH = 3.0 # grip teeth across the ridge underside
+CLAMP_TOOTH_DEPTH = 0.6
+
 # =============================================================================
 # DERIVED Z LEVELS
 # =============================================================================
@@ -476,9 +500,110 @@ def build_shell():
             for c in keyhole_cuts(x):
                 shell = shell.cut(c)
 
+    if CHANNEL_ENABLE:
+        shell = add_channel(shell)
+
     for c in side_cutouts():
         shell = shell.cut(c)
     return shell
+
+
+# =============================================================================
+# P1 CABLE CHANNEL + CLAMP
+# =============================================================================
+def channel_geom():
+    """All channel/clamp coordinates (assembly frame) in one place."""
+    g = {}
+    d = CHANNEL_DIR
+    g["ch_w"] = CABLE_D + CH_CLR
+    g["gx1"] = -(CLR + WALL)                     # groove inner face = wall face
+    g["gx0"] = g["gx1"] - g["ch_w"]
+    g["dx0"] = g["gx0"] - CH_OUTER_WALL          # duct outer face
+    g["xc"] = (g["gx0"] + g["gx1"]) / 2
+    g["zg0"] = Z_FLOOR_OUT + CH_FLOOR_T          # groove floor
+    g["zg1"] = g["zg0"] + g["ch_w"] + CH_LIP_T   # duct / tongue top
+    # y: a = behind P1, b = case edge, c = tongue end
+    g["y_p1"] = P1_YC - d * P1_CUT_W / 2         # groove starts at the P1 window
+    g["ya"] = g["y_p1"] - d * CH_OUTER_WALL
+    g["yb"] = (PCB_H + CLR + WALL) if d > 0 else -(CLR + WALL)
+    g["yc"] = g["yb"] + d * CLAMP_TONGUE_L
+    g["y_clamp"] = g["yb"] + d * (CLAMP_TONGUE_L / 2 + 0.5)
+    g["tx0"] = g["xc"] - CLAMP_SCREW_DX - CLAMP_BOSS_R
+    g["tx1"] = g["xc"] + CLAMP_SCREW_DX + CLAMP_BOSS_R
+    g["cable_top"] = g["zg0"] + CABLE_D          # cable resting on the floor
+    assert g["zg1"] < Z_SEAM, "channel taller than the back shell"
+    return g
+
+
+def ybox(x0, x1, ya, yb, z0, z1):
+    return box(x0, min(ya, yb), z0, x1, max(ya, yb), z1)
+
+
+def add_channel(shell):
+    g = channel_geom()
+    d = CHANNEL_DIR
+    # duct along the wall (overlaps the wall by 0.5 for a solid union)
+    duct = ybox(g["dx0"], g["gx1"] + 0.5, g["ya"], g["yb"], Z_FLOOR_OUT, g["zg1"])
+    # clamp tongue past the case edge (starts 1 mm inside the edge)
+    tongue = ybox(g["tx0"], g["tx1"], g["yb"] - d * 1.0, g["yc"], Z_FLOOR_OUT,
+                  g["zg1"]).edges("|Z").fillet(2.0)
+    shell = shell.union(duct).union(tongue)
+
+    # groove (open to the front), through the tongue end
+    shell = shell.cut(ybox(g["gx0"], g["gx1"], g["y_p1"], g["yc"] + d * 1.0,
+                           g["zg0"], g["zg1"] + 1.0))
+    # snap lips along the duct part only (the clamp ridge needs a clear groove)
+    lz0 = g["zg1"] - CH_LIP_T
+    for lx0, lx1 in ((g["gx0"] - 0.01, g["gx0"] + CH_LIP_OVERLAP),
+                     (g["gx1"] - CH_LIP_OVERLAP, g["gx1"] + 0.01)):
+        shell = shell.union(ybox(lx0, lx1, g["y_p1"], g["yb"], lz0, g["zg1"]))
+
+    # rounded exit edge of the groove floor (bend protection)
+    r = CH_EXIT_R
+    corner = ybox(g["gx0"], g["gx1"], g["yc"] - d * r, g["yc"] + d * 0.01,
+                  g["zg0"] - r, g["zg0"] + 0.01)
+    keep = (cq.Workplane("YZ").circle(r).extrude(g["ch_w"] + 0.02)
+            .translate((g["gx0"] - 0.01, g["yc"] - d * r, g["zg0"] - r)))
+    shell = shell.cut(corner.cut(keep))
+
+    # heat-set inserts for the clamp screws (from the front face)
+    for sx in (-1, 1):
+        shell = shell.cut(cyl(g["xc"] + sx * CLAMP_SCREW_DX, g["y_clamp"],
+                              INSERT_HOLE_D, g["zg1"] - INSERT_HOLE_DEPTH,
+                              g["zg1"] + 1))
+    return shell
+
+
+def build_clamp():
+    """Screw-down clamp bar (assembly position = tightened on the cable)."""
+    g = channel_geom()
+    yc0, yc1 = g["y_clamp"] - CLAMP_W / 2, g["y_clamp"] + CLAMP_W / 2
+    bar = rrect(g["tx0"], yc0, g["tx1"], yc1, 2.0, g["zg1"], g["zg1"] + CLAMP_T)
+    # ridge that reaches into the groove and squeezes the jacket
+    half = g["ch_w"] / 2 - 0.3
+    rz0 = g["cable_top"] - CLAMP_SQUEEZE
+    ridge = box(g["xc"] - half, yc0, rz0, g["xc"] + half, yc1, g["zg1"] + 0.01)
+    # transverse grip teeth: shallow grooves across the ridge underside
+    n = int(CLAMP_W // CLAMP_TOOTH_PITCH)
+    y = yc0 + (CLAMP_W - (n - 1) * CLAMP_TOOTH_PITCH) / 2
+    for i in range(n - 1):
+        yy = y + (i + 0.5) * CLAMP_TOOTH_PITCH
+        ridge = ridge.cut(box(g["xc"] - half - 1, yy - 0.6, rz0 - 1,
+                              g["xc"] + half + 1, yy + 0.6, rz0 + CLAMP_TOOTH_DEPTH))
+    clamp = bar.union(ridge)
+    for sx in (-1, 1):
+        clamp = clamp.cut(cyl(g["xc"] + sx * CLAMP_SCREW_DX, g["y_clamp"],
+                              SCREW_CLEAR_D, rz0 - 1, g["zg1"] + CLAMP_T + 1))
+    return clamp
+
+
+def cable_probe():
+    """CAT5 jacket lying on the groove floor, from the P1 window to past the end."""
+    g = channel_geom()
+    d = CHANNEL_DIR
+    y0, y1 = g["y_p1"] + d * 0.5, g["yc"] + d * 8.0
+    return (cq.Workplane("XZ").circle(CABLE_D / 2).extrude(-(abs(y1 - y0)))
+            .translate((g["xc"], min(y0, y1), g["zg0"] + CABLE_D / 2)))
 
 
 # =============================================================================
@@ -504,6 +629,9 @@ def probes():
     usb_zc = zb - USB_H / 2
     p["USB-C plug body"] = xbox_y(USB_YC, USB_PLUG_W, -far, -USB_OVERHANG,
                                   usb_zc - USB_PLUG_H / 2, usb_zc + USB_PLUG_H / 2)
+    p["USB-C plug + 30 mm overmould"] = xbox_y(USB_YC, USB_PLUG_W, -30.0,
+                                               -USB_OVERHANG, usb_zc - USB_PLUG_H / 2,
+                                               usb_zc + USB_PLUG_H / 2)
     p1_zc = zb - P1_H / 2
     p["P1 JST plug"] = xbox_y(P1_YC, P1_PLUG_W, -far, 0.0,
                               p1_zc - P1_PLUG_H / 2, p1_zc + P1_PLUG_H / 2)
@@ -528,10 +656,13 @@ def bbox_str(shape):
                bb.xlen, bb.ylen, bb.zlen))
 
 
-def run_checks(bezel, shell, board):
+def run_checks(bezel, shell, board, clamp=None):
     ok = True
     print("\n=== Re-import of exported STEP files ===")
-    for fn in ("bezel.step", "back_shell.step", "assembly.step"):
+    files = ["bezel.step", "back_shell.step", "assembly.step"]
+    if clamp is not None:
+        files.insert(2, "clamp.step")
+    for fn in files:
         path = os.path.join(HERE, fn)
         imp = cq.importers.importStep(path)
         solids = imp.solids().vals()
@@ -562,6 +693,30 @@ def run_checks(bezel, shell, board):
         ok &= good
         print("  %-34s bezel %8.4f  shell %8.4f  %s"
               % (name, v1, v2, "OK" if good else "BLOCKED"))
+
+    if clamp is not None:
+        print("\n=== P1 cable channel + clamp ===")
+        cab = cable_probe()
+        for name, part in (("back_shell", shell), ("bezel", bezel)):
+            v = inter_vol(cab, part)
+            ok &= v < 1e-3
+            print("  CAT5 cable (d=%.1f) x %-11s %8.4f mm^3  %s"
+                  % (CABLE_D, name, v, "OK" if v < 1e-3 else "BLOCKED"))
+        for name, part in [("back_shell", shell), ("bezel", bezel)] + list(board.items()):
+            v = inter_vol(clamp, part)
+            ok &= v < 1e-3
+            if v >= 1e-3 or name in ("back_shell", "bezel"):
+                print("  clamp x %-22s %8.4f mm^3  %s"
+                      % (name, v, "OK" if v < 1e-3 else "COLLISION"))
+        v = inter_vol(clamp, cab)
+        ok &= v > 1.0
+        print("  clamp squeezes cable: %.1f mm^3 overlap (%.1f mm)  %s"
+              % (v, CLAMP_SQUEEZE, "OK" if v > 1.0 else "NO GRIP"))
+        g = channel_geom()
+        print("  channel protrudes %.1f mm beyond the side wall, tongue %.1f mm "
+              "beyond the edge; clamp screws M3 x %.0f"
+              % (g["gx1"] - g["dx0"], CLAMP_TONGUE_L,
+                 CLAMP_T + INSERT_HOLE_DEPTH - 1.0))
 
     print("\n=== Window vs active area ===")
     wx0, wx1 = GLASS_X0 + LIP, GLASS_X0 + GLASS_W - LIP
@@ -650,9 +805,9 @@ def render_section(named, path, axis, at, title):
     plt.close(fig)
 
 
-def render_all(bezel, shell, board):
+def render_all(bezel, shell, board, clamp=None):
     out = lambda n: os.path.join(HERE, n)
-    shells = [bezel.val(), shell.val()]
+    shells = [bezel.val(), shell.val()] + ([clamp.val()] if clamp is not None else [])
     front = cq.Compound.makeCompound(
         shells + [board[k].val() for k in ("glass", "pcb")])
     both = cq.Compound.makeCompound(shells)
@@ -663,6 +818,9 @@ def render_all(bezel, shell, board):
     render_view(shell, out("preview_back_shell.png"), (-1.75, 1.1, 5))
     grey = {"bezel": "#2f3640", "back_shell": "#7f8c9a"}
     named = [("bezel", bezel, grey["bezel"]), ("back_shell", shell, grey["back_shell"])]
+    if clamp is not None:
+        named.append(("clamp", clamp, "#e74c3c"))
+        named.append(("CAT5 cable", cable_probe(), "#3498db"))
     pal = {"pcb": "#d9a520", "lcd": "#9aa5b1", "glass": "#5dade2",
            "usb_c": "#c0392b", "p1_uart": "#27ae60", "sd_socket": "#8e44ad",
            "smd_envelope": "#f5cba7", "esp32s3": "#16a085"}
@@ -674,6 +832,14 @@ def render_all(bezel, shell, board):
                    "Section Y=%.1f (through P1 UART connector)" % P1_YC)
     render_section(named, out("preview_section_sd.png"), "x", SD_XC,
                    "Section X=%.1f (through micro-SD slot)" % SD_XC)
+    if clamp is not None:
+        g = channel_geom()
+        render_section(named, out("preview_section_clamp.png"), "y", g["y_clamp"],
+                       "Section Y=%.1f (through the cable clamp)" % g["y_clamp"])
+        render_section(named, out("preview_section_channel.png"), "x", g["xc"],
+                       "Section X=%.1f (along the cable channel)" % g["xc"])
+        render_view(cq.Compound.makeCompound(shells), out("preview_channel.png"),
+                    (-1.2, 1.6, 1.0))
 
 
 # =============================================================================
@@ -687,13 +853,18 @@ def main():
     bezel = build_bezel()
     print("Building back shell ...")
     shell = build_shell()
+    clamp = build_clamp() if CHANNEL_ENABLE else None
 
     # ---- STEP (assembly coordinates) ----
     cq.exporters.export(bezel, os.path.join(HERE, "bezel.step"))
     cq.exporters.export(shell, os.path.join(HERE, "back_shell.step"))
+    if clamp is not None:
+        cq.exporters.export(clamp, os.path.join(HERE, "clamp.step"))
     assy = cq.Assembly(name="ESP32-8048S070C_enclosure")
     assy.add(shell, name="back_shell", color=cq.Color(0.25, 0.25, 0.28))
     assy.add(bezel, name="bezel", color=cq.Color(0.15, 0.15, 0.15))
+    if clamp is not None:
+        assy.add(clamp, name="cable_clamp", color=cq.Color(0.8, 0.2, 0.2))
     colors = {"pcb": (0.85, 0.65, 0.1), "lcd": (0.7, 0.7, 0.7),
               "glass": (0.1, 0.1, 0.2)}
     for name, b in board.items():
@@ -709,12 +880,17 @@ def main():
                         tolerance=0.02, angularTolerance=0.1)
     cq.exporters.export(shell_print, os.path.join(HERE, "back_shell.stl"),
                         tolerance=0.02, angularTolerance=0.1)
+    if clamp is not None:              # flat top on the bed, ridge up
+        top = channel_geom()["zg1"] + CLAMP_T
+        clamp_print = clamp.rotate((0, 0, 0), (1, 0, 0), 180).translate((0, 0, top))
+        cq.exporters.export(clamp_print, os.path.join(HERE, "clamp.stl"),
+                            tolerance=0.02, angularTolerance=0.1)
 
-    ok = run_checks(bezel, shell, board)
+    ok = run_checks(bezel, shell, board, clamp)
 
     if do_png:
         print("\nRendering previews ...")
-        render_all(bezel, shell, board)
+        render_all(bezel, shell, board, clamp)
     return 0 if ok else 1
 
 
